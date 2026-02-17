@@ -1102,14 +1102,6 @@ export default function AssignTask() {
         return;
       }
 
-      // Determine the main sheet based on task type
-      let submitSheetName;
-      if (formData.taskType === "delegation") {
-        submitSheetName = "DELEGATION";
-      } else {
-        submitSheetName = "CHECKLIST";
-      }
-
       // Check if selected date is today
       const isToday = () => {
         if (!date) return false;
@@ -1137,39 +1129,40 @@ export default function AssignTask() {
         }
       }
 
-      // Get task IDs for main sheet
-      const lastTaskIdMain = await getLastTaskId(submitSheetName);
-      let nextTaskIdMain = lastTaskIdMain + 1;
+      // ✅ For DELEGATION tasks, submit to DELEGATION sheet
+      if (formData.taskType === "delegation") {
+        const submitSheetName = "DELEGATION";
+        const lastTaskIdMain = await getLastTaskId(submitSheetName);
+        let nextTaskIdMain = lastTaskIdMain + 1;
 
-      // Prepare tasks data
-      const tasksDataMain = tasksToSubmit.map((task, index) => ({
-        timestamp: getCurrentTimestamp(),
-        taskId: (nextTaskIdMain + index).toString(),
-        firm: task.department,
-        givenBy: task.givenBy,
-        name: task.doer,
-        description: task.description,
-        startDate: task.dueDate,
-        freq: task.frequency,
-        enableReminders: task.enableReminders ? "Yes" : "No",
-        requireAttachment: task.requireAttachment ? "Yes" : "No",
-      }));
+        const tasksDataMain = tasksToSubmit.map((task, index) => ({
+          timestamp: getCurrentTimestamp(),
+          taskId: (nextTaskIdMain + index).toString(),
+          firm: task.department,
+          givenBy: task.givenBy,
+          name: task.doer,
+          description: task.description,
+          startDate: task.dueDate,
+          freq: task.frequency,
+          enableReminders: task.enableReminders ? "Yes" : "No",
+          requireAttachment: task.requireAttachment ? "Yes" : "No",
+        }));
 
-      // Submit to main sheet (Delegation / Checklist)
-      const formPayloadMain = new FormData();
-      formPayloadMain.append("sheetName", submitSheetName);
-      formPayloadMain.append("action", "insert");
-      formPayloadMain.append("batchInsert", "true");
-      formPayloadMain.append("rowData", JSON.stringify(tasksDataMain));
+        const formPayloadMain = new FormData();
+        formPayloadMain.append("sheetName", submitSheetName);
+        formPayloadMain.append("action", "insert");
+        formPayloadMain.append("batchInsert", "true");
+        formPayloadMain.append("rowData", JSON.stringify(tasksDataMain));
 
-      await fetch(
-        "https://script.google.com/macros/s/AKfycbwxe45-zdY7HMvMOmYg3n05GTyn7uhscbojSJB5nQDy2nPKA5Rn9pw_EOUbGG6BSYagFA/exec",
-        {
-          method: "POST",
-          body: formPayloadMain,
-          mode: "no-cors",
-        }
-      );
+        await fetch(
+          "https://script.google.com/macros/s/AKfycbwxe45-zdY7HMvMOmYg3n05GTyn7uhscbojSJB5nQDy2nPKA5Rn9pw_EOUbGG6BSYagFA/exec",
+          {
+            method: "POST",
+            body: formPayloadMain,
+            mode: "no-cors",
+          }
+        );
+      }
 
       // ✅ Submit to UNIQUE sheet for checklist tasks
       if (formData.taskType === "checklist") {
@@ -1205,34 +1198,44 @@ export default function AssignTask() {
           }
         );
 
-        // ✅ Also submit the same UNIQUE data to CHECKLIST sheet
-        const formPayloadUniqueToMain = new FormData();
-        formPayloadUniqueToMain.append("sheetName", "CHECKLIST");
-        formPayloadUniqueToMain.append("action", "insert");
-        formPayloadUniqueToMain.append("batchInsert", "true");
-        formPayloadUniqueToMain.append("rowData", JSON.stringify(tasksDataUnique));
+        // ✅ Do NOT submit to CHECKLIST directly
+        // The processChecklistAndGenerateTasks() function will handle CHECKLIST population
 
-        await fetch(
-          "https://script.google.com/macros/s/AKfycbwxe45-zdY7HMvMOmYg3n05GTyn7uhscbojSJB5nQDy2nPKA5Rn9pw_EOUbGG6BSYagFA/exec",
-          {
-            method: "POST",
-            body: formPayloadUniqueToMain,
-            mode: "no-cors",
-          }
-        );
+        // ✅ Trigger checklist processing immediately after submission
+        console.log("Triggering processChecklistAndGenerateTasks...");
+        try {
+          const triggerPayload = new FormData();
+          triggerPayload.append("action", "runChecklistNow");
+
+          await fetch(
+            "https://script.google.com/macros/s/AKfycbwxe45-zdY7HMvMOmYg3n05GTyn7uhscbojSJB5nQDy2nPKA5Rn9pw_EOUbGG6BSYagFA/exec",
+            {
+              method: "POST",
+              body: triggerPayload,
+              mode: "no-cors",
+            }
+          );
+          console.log("Checklist processing triggered successfully!");
+        } catch (error) {
+          console.error("Error triggering checklist processing:", error);
+          // Don't fail the submission if trigger fails
+        }
       }
 
       // Success message
       const taskCount = tasksToSubmit.length;
-      let successMessage = `Successfully submitted ${taskCount} task(s) to ${submitSheetName}`;
+      let successMessage;
 
       if (formData.taskType === "checklist") {
-        successMessage += ` and UNIQUE sheets!`;
+        successMessage = `Successfully submitted ${taskCount} task(s) to UNIQUE sheet! Tasks will be generated automatically.`;
+      } else {
+        successMessage = `Successfully submitted ${taskCount} task(s) to DELEGATION sheet!`;
       }
+
       if (isToday()) {
-        successMessage =
-          `Today's date selected - submitted ${taskCount} task(s) to ${submitSheetName}` +
-          (formData.taskType === "checklist" ? " and UNIQUE sheets!" : "!");
+        successMessage = formData.taskType === "checklist"
+          ? `Today's date selected - submitted ${taskCount} task(s) to UNIQUE sheet! Tasks will be generated automatically.`
+          : `Today's date selected - submitted ${taskCount} task(s) to DELEGATION sheet!`;
       }
 
       // alert(successMessage);
