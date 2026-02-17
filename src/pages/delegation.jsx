@@ -7,7 +7,8 @@ import {
   Search,
   ArrowLeft,
   Edit,
-  Image
+  Image,
+  Filter
 } from "lucide-react";
 import AdminLayout from "../components/layout/AdminLayout";
 
@@ -68,6 +69,8 @@ function DelegationDataPage() {
     end: "",
   });
 
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
   const [delegationData, setDelegationData] = useState([]);
 
   const [statusCounts, setStatusCounts] = useState({
@@ -228,6 +231,27 @@ function DelegationDataPage() {
     [formatDateToDDMMYYYY]
   );
 
+  const parseDateFromDDMMYYYY = useCallback((dateStr) => {
+    if (!dateStr || typeof dateStr !== "string") return null;
+    const parts = dateStr.split("/");
+    if (parts.length !== 3) return null;
+    return new Date(parts[2], parts[1] - 1, parts[0]);
+  }, []);
+
+  const getDateCategory = useCallback((dateStr) => {
+    if (!dateStr) return null;
+    const taskDate = parseDateFromDDMMYYYY(dateStr);
+    if (!taskDate) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    taskDate.setHours(0, 0, 0, 0);
+
+    if (taskDate < today) return "Overdue";
+    if (taskDate.getTime() === today.getTime()) return "Today";
+    return "Upcoming";
+  }, [parseDateFromDDMMYYYY]);
+
   const formatDateForDisplay = useCallback(
     (dateStr) => {
       if (!dateStr) return "—";
@@ -244,12 +268,7 @@ function DelegationDataPage() {
     [parseGoogleSheetsDate]
   );
 
-  const parseDateFromDDMMYYYY = useCallback((dateStr) => {
-    if (!dateStr || typeof dateStr !== "string") return null;
-    const parts = dateStr.split("/");
-    if (parts.length !== 3) return null;
-    return new Date(parts[2], parts[1] - 1, parts[0]);
-  }, []);
+
 
   const sortDateWise = useCallback(
     (a, b) => {
@@ -278,6 +297,7 @@ function DelegationDataPage() {
     setSearchTerm("");
     setStartDate("");
     setEndDate("");
+    setSelectedCategory("");
   }, []);
 
   const getRowColor = useCallback((colorCode) => {
@@ -437,6 +457,11 @@ function DelegationDataPage() {
           return false;
         }
 
+        if (selectedCategory) {
+          const cat = getDateCategory(account["col10"] || account["col6"]);
+          if (cat !== selectedCategory) return false;
+        }
+
         return true;
       })
       .sort(sortDateWise);
@@ -446,9 +471,11 @@ function DelegationDataPage() {
     nameFilter,
     dateRange,
     statusFilter,
+    selectedCategory,
     formatDateForDisplay,
     parseDateFromDDMMYYYY,
     sortDateWise,
+    getDateCategory,
   ]);
 
   const uniqueNames = useMemo(() => {
@@ -1056,6 +1083,17 @@ function DelegationDataPage() {
             </div>
 
             <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-4 py-2 border rounded-md transition-all ${showFilters
+                ? "bg-purple-100 border-purple-300 text-purple-700 font-medium"
+                : "border-purple-200 text-purple-600 hover:bg-purple-50"
+                }`}
+            >
+              <Filter size={18} />
+              <span>Filters</span>
+            </button>
+
+            <button
               onClick={handleSubmit}
               disabled={selectedItemsCount === 0 || isSubmitting}
               className="w-52 gradient-bg py-3 px-4 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
@@ -1082,132 +1120,115 @@ function DelegationDataPage() {
           </div>
         )}
 
-        <div className="w-full flex flex-wrap items-center gap-4 mt-4 mb-4">
-          {/* Name Filter */}
-          <div className="flex items-center">
-            <select
-              id="name-filter"
-              value={nameFilter}
-              onChange={(e) => setNameFilter(e.target.value)}
-              className="border border-purple-300 rounded-lg px-3 py-2 text-sm min-w-[160px] max-w-[200px] focus:outline-none focus:ring-2 focus:ring-purple-400 shadow-sm"
-              disabled={userRole !== "admin" && uniqueNames.length <= 1}
-            >
-              <option value="">All Names</option>
-              {uniqueNames.map((name) => (
-                <option key={name} value={name} className="uppercase">
-                  {name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Date Filter */}
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <label
-                htmlFor="start-date"
-                className="text-sm font-semibold text-purple-700"
-              >
-                From:
-              </label>
-              <input
-                type="date"
-                id="start-date"
-                value={dateRange.start}
-                onChange={(e) =>
-                  setDateRange((prev) => ({ ...prev, start: e.target.value }))
-                }
-                className="border border-purple-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 shadow-sm"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <label
-                htmlFor="end-date"
-                className="text-sm font-semibold text-purple-700"
-              >
-                To:
-              </label>
-              <input
-                type="date"
-                id="end-date"
-                value={dateRange.end}
-                onChange={(e) =>
-                  setDateRange((prev) => ({ ...prev, end: e.target.value }))
-                }
-                className="border border-purple-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 shadow-sm"
-              />
-            </div>
-          </div>
-
-          {/* Status Filter */}
-          <div className="flex items-center">
-            <select
-              id="status-filter"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="border border-purple-300 rounded-lg px-3 py-2 text-sm min-w-[160px] max-w-[200px] focus:outline-none focus:ring-2 focus:ring-purple-400 shadow-sm"
-            >
-              <option value="">
-                All Status ({filteredAccountData.length})
-              </option>
-              {/* <option value="Done">✅ Done ({statusCounts.Done})</option> */}
-              <option value="Pending">
-                🕒 Pending ({statusCounts.Pending})
-              </option>
-              <option value="Verify Pending">
-                🔍 Verify Pending ({statusCounts["Verify Pending"]})
-              </option>
-              <option value="Planned">
-                📜 Planned ({statusCounts.Planned})
-              </option>
-            </select>
-          </div>
-
-          {/* Clear Filters Button */}
-          {(nameFilter || statusFilter || dateRange.start || dateRange.end) && (
+        {showFilters && (
+          <div className="w-full bg-purple-50/50 p-6 rounded-xl border border-purple-100 shadow-sm transition-all animate-in fade-in slide-in-from-top-4 duration-300 relative">
             <button
-              onClick={() => {
-                setNameFilter("");
-                setDateRange({ start: "", end: "" });
-                setStatusFilter("");
-              }}
-              className="ml-auto flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-all duration-200"
+              onClick={() => setShowFilters(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-full text-purple-400 hover:text-purple-600 hover:bg-purple-100 transition-colors"
+              title="Close filters"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-              Clear Filters
+              <X size={18} />
             </button>
-          )}
-        </div>
 
-        {
-          successMessage && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md flex items-center justify-between">
-              <div className="flex items-center">
-                <CheckCircle2 className="h-5 w-5 mr-2 text-green-500" />
-                {successMessage}
+            <div className="flex flex-wrap items-center gap-6">
+              {/* Name Filter */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-purple-700">Name:</label>
+                <select
+                  id="name-filter"
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.target.value)}
+                  className="border border-purple-200 rounded-lg px-3 py-2 text-sm min-w-[180px] focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white transition-all hover:border-purple-300"
+                  disabled={userRole !== "admin" && uniqueNames.length <= 1}
+                >
+                  <option value="">All Names</option>
+                  {uniqueNames.map((name) => (
+                    <option key={name} value={name} className="uppercase">
+                      {name}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <button
-                onClick={() => setSuccessMessage("")}
-                className="text-green-500 hover:text-green-700"
-              >
-                <X className="h-5 w-5" />
-              </button>
+
+              {/* Date Filter */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-purple-700">Date Range:</label>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-purple-500 font-medium">From</span>
+                    <input
+                      type="date"
+                      value={dateRange.start}
+                      onChange={(e) =>
+                        setDateRange((prev) => ({ ...prev, start: e.target.value }))
+                      }
+                      className="border border-purple-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-purple-500 font-medium">To</span>
+                    <input
+                      type="date"
+                      value={dateRange.end}
+                      onChange={(e) =>
+                        setDateRange((prev) => ({ ...prev, end: e.target.value }))
+                      }
+                      className="border border-purple-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-purple-700">Status:</label>
+                <select
+                  id="status-filter"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="border border-purple-200 rounded-lg px-3 py-2 text-sm min-w-[180px] focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white transition-all hover:border-purple-300"
+                >
+                  <option value="">All Status ({filteredAccountData.length})</option>
+                  <option value="Pending">🕒 Pending ({statusCounts.Pending})</option>
+                  <option value="Verify Pending">🔍 Verify Pending ({statusCounts["Verify Pending"]})</option>
+                  <option value="Planned">📜 Planned ({statusCounts.Planned})</option>
+                </select>
+              </div>
+
+              {/* Category Filter */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-purple-700">Category:</label>
+                <select
+                  id="category-filter"
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="border border-purple-200 rounded-lg px-3 py-2 text-sm min-w-[180px] focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white transition-all hover:border-purple-300"
+                >
+                  <option value="">All Categories</option>
+                  <option value="Today">Today</option>
+                  <option value="Upcoming">Upcoming</option>
+                  <option value="Overdue">Overdue</option>
+                </select>
+              </div>
+
+              {/* Clear Filters Button */}
+              {(nameFilter || statusFilter || dateRange.start || dateRange.end || selectedCategory) && (
+                <button
+                  onClick={() => {
+                    setNameFilter("");
+                    setDateRange({ start: "", end: "" });
+                    setStatusFilter("");
+                    setSelectedCategory("");
+                  }}
+                  className="mt-6 flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                >
+                  <X size={16} />
+                  Clear All
+                </button>
+              )}
             </div>
-          )
-        }
+          </div>
+        )}
 
         <div className="rounded-lg border border-purple-200 shadow-md bg-white overflow-hidden">
           <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 p-4">
@@ -1275,13 +1296,27 @@ function DelegationDataPage() {
                         <div className="p-4 space-y-3">
                           <div className="flex items-start justify-between">
                             <div className="flex items-center space-x-3">
-                              <input
-                                type="checkbox"
-                                className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                                checked={isSelected}
-                                onChange={(e) => handleCheckboxClick(e, account._id)}
-                                disabled={isTaskDisabled(account["col20"], userRole)}
-                              />
+                              <div className="flex flex-col items-center gap-1.5">
+                                {(() => {
+                                  const dateStr = account["col10"] || account["col6"];
+                                  const dateCategory = getDateCategory(dateStr);
+                                  return dateCategory && (
+                                    <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold rounded uppercase whitespace-nowrap ${dateCategory === 'Overdue' ? 'bg-red-100 text-red-700' :
+                                      dateCategory === 'Today' ? 'bg-blue-100 text-blue-700' :
+                                        'bg-green-100 text-green-700'
+                                      }`}>
+                                      {dateCategory}
+                                    </span>
+                                  );
+                                })()}
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                  checked={isSelected}
+                                  onChange={(e) => handleCheckboxClick(e, account._id)}
+                                  disabled={isTaskDisabled(account["col20"], userRole)}
+                                />
+                              </div>
                               <div className="flex flex-col">
                                 <span className="text-xs text-gray-500 mt-1">ID: {account["col1"] || "—"}</span>
                               </div>
@@ -1395,7 +1430,7 @@ function DelegationDataPage() {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-11 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           <input
                             type="checkbox"
                             className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
@@ -1481,18 +1516,32 @@ function DelegationDataPage() {
                                 }`}
                             >
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                                  checked={isSelected}
-                                  onChange={(e) =>
-                                    handleCheckboxClick(e, account._id)
-                                  }
-                                  disabled={isTaskDisabled(
-                                    account["col20"],
-                                    userRole
-                                  )}
-                                />
+                                <div className="flex flex-col items-center gap-1.5">
+                                  {(() => {
+                                    const dateStr = account["col10"] || account["col6"];
+                                    const dateCategory = getDateCategory(dateStr);
+                                    return dateCategory && (
+                                      <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded uppercase whitespace-nowrap ${dateCategory === 'Overdue' ? 'bg-red-100 text-red-700' :
+                                        dateCategory === 'Today' ? 'bg-blue-100 text-blue-700' :
+                                          'bg-green-100 text-green-700'
+                                        }`}>
+                                        {dateCategory}
+                                      </span>
+                                    );
+                                  })()}
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                    checked={isSelected}
+                                    onChange={(e) =>
+                                      handleCheckboxClick(e, account._id)
+                                    }
+                                    disabled={isTaskDisabled(
+                                      account["col20"],
+                                      userRole
+                                    )}
+                                  />
+                                </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900">

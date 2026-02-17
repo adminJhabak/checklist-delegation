@@ -401,12 +401,13 @@ const CalendarUI = ({ userRole, userName, displayName }) => {
         uniqueTasks = transformToTasks(uniqueResponse.data.table.rows);
       }
 
-      // NEW: Extract unique names for dropdown
-      const names = extractUniqueNames(uniqueTasks);
+      // NEW: Extract unique names for dropdown (filtered by role)
+      const tasksFilteredByRole = roleFilteredTasks(uniqueTasks);
+      const names = extractUniqueNames(tasksFilteredByRole);
       setAvailableNames(names);
 
-      // Step 3: Calculate stats
-      calculateStats(uniqueTasks);
+      // Step 3: Calculate stats (filtered by role)
+      calculateStats(tasksFilteredByRole);
 
       // Step 4: Build combined per-date map from today to last working date
       const map = generateCombinedDateMap(uniqueTasks, allDates);
@@ -633,19 +634,21 @@ const CalendarUI = ({ userRole, userName, displayName }) => {
 
                 {/* Actions on Right Side */}
                 <div className="flex gap-2 items-center">
-                  {/* Name Filter Dropdown */}
-                  <select
-                    value={selectedNameFilter}
-                    onChange={(e) => setSelectedNameFilter(e.target.value)}
-                    className="px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all"
-                  >
-                    <option value="all">All Names</option>
-                    {availableNames.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
+                  {/* Name Filter Dropdown - Only show for admin */}
+                  {(role === "admin" || role === "main admin") && (
+                    <select
+                      value={selectedNameFilter}
+                      onChange={(e) => setSelectedNameFilter(e.target.value)}
+                      className="px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all"
+                    >
+                      <option value="all">All Names</option>
+                      {availableNames.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
 
                   {/* Refresh Button */}
                   <button

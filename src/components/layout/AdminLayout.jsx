@@ -81,7 +81,7 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
       label: "Unique Task",
       icon: Zap,
       active: location.pathname === "/dashboard/quick-task",
-      showFor: ["admin", "user"] // Only show for admin
+      showFor: ["admin"] // Only show for admin
     },
     {
       href: "/dashboard/delegation",
@@ -117,7 +117,7 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
       label: "Holiday List",
       icon: Calendar,
       active: location.pathname === "/dashboard/holiday-list",
-      showFor: ["admin", "user"]
+      showFor: ["admin",]
     },
     {
       href: "/dashboard/license",
@@ -138,7 +138,7 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
       label: "Settings",
       icon: Settings,
       active: location.pathname === "/dashboard/settings",
-      showFor: ["admin", "user"] //  show both
+      showFor: ["admin",] //  show both
     }
   ]
 

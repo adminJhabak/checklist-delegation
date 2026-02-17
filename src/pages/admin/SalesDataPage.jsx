@@ -92,6 +92,27 @@ const getStatusColor = (status) => {
   }
 };
 
+// Helper function to determine date category
+const getDateCategory = (taskStartDate) => {
+  if (!taskStartDate) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const taskDate = parseDateFromDDMMYYYY(taskStartDate);
+  if (!taskDate) return null;
+
+  taskDate.setHours(0, 0, 0, 0);
+
+  if (taskDate.getTime() < today.getTime()) {
+    return 'Overdue';
+  } else if (taskDate.getTime() === today.getTime()) {
+    return 'Today';
+  } else {
+    return 'Upcoming';
+  }
+};
+
 
 const getSubmissionStatus = (actualDate, delayColumn, leaveColumn) => {
   if (isLeaveStatus(leaveColumn)) {
@@ -118,7 +139,8 @@ const MemoizedTaskRow = memo(({
   onCheckboxClick,
   onAdditionalDataChange,
   onRemarksChange,
-  onImageUpload
+  onImageUpload,
+  dateCategory
 }) => {
   const isLeave = isLeaveStatus(account["col16"]);
   const taskStatus = isLeave ? "Leave" : getTaskStatus(account["col10"], account["col15"], account["col6"], account["col4"]);
@@ -130,23 +152,28 @@ const MemoizedTaskRow = memo(({
       className={`group ${isSelected ? "bg-purple-50" : ""} ${isNotToday ? "bg-white border-l-4 border-red-600" : "hover:bg-gray-50"} ${isDisabled ? "opacity-90 cursor-not-allowed" : ""}`}
     >
       <td className={`px-3 py-4 w-12 sticky left-0 z-30 ${isSelected ? "bg-purple-50" : isNotToday ? "bg-white" : "bg-white group-hover:bg-gray-50"}`}>
-        <input
-          type="checkbox"
-          className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-          checked={isSelected}
-          onChange={(e) => onCheckboxClick(e, account._id)}
-          disabled={isDisabled}
-        />
+        <div className="flex flex-col items-center gap-1.5">
+          {dateCategory && (
+            <span className={`inline-flex px-1 py-0.5 text-[9px] font-bold rounded uppercase whitespace-nowrap ${dateCategory === 'Overdue' ? 'bg-red-100 text-red-700' :
+              dateCategory === 'Today' ? 'bg-blue-100 text-blue-700' :
+                'bg-green-100 text-green-700'
+              }`}>
+              {dateCategory}
+            </span>
+          )}
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+            checked={isSelected}
+            onChange={(e) => onCheckboxClick(e, account._id)}
+            disabled={isDisabled}
+          />
+        </div>
       </td>
       <td className={`px-3 py-4 w-20 sticky left-12 z-30 ${isSelected ? "bg-purple-50" : isNotToday ? "bg-white" : "bg-white group-hover:bg-gray-50"}`}>
         <div className={`text-sm break-words font-medium ${isNotToday ? "text-red-600" : "text-gray-900"}`}>
           {account["col1"] || "—"}
         </div>
-      </td>
-      <td className="px-3 py-4 min-w-[80px]">
-        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(taskStatus)}`}>
-          {taskStatus}
-        </span>
       </td>
       {/* Keep all other existing td elements with the same text color logic */}
 
@@ -279,6 +306,7 @@ function AccountDataPage() {
   const [userRole, setUserRole] = useState("")
   const [username, setUsername] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("") // New filter for status
+  const [selectedCategory, setSelectedCategory] = useState("") // New filter for category (Upcoming, Today, Overdue)
   const [showFilters, setShowFilters] = useState(false) // Toggle for filter section
   const [nameSearchTerm, setNameSearchTerm] = useState("") // Search term for name dropdown
   const [displayLimit, setDisplayLimit] = useState(50)
@@ -411,6 +439,7 @@ function AccountDataPage() {
     setStartDate("")
     setEndDate("")
     setSelectedStatus("")
+    setSelectedCategory("")
     setNameSearchTerm("")
   }, [])
 
@@ -444,6 +473,13 @@ function AccountDataPage() {
           const taskStatus = getTaskStatus(account["col10"], account["col15"], account["col6"], account["col4"]);
           return taskStatus === selectedStatus;
         }
+      });
+    }
+
+    if (selectedCategory) {
+      filtered = filtered.filter((account) => {
+        const cat = getDateCategory(account["col6"]);
+        return cat === selectedCategory;
       });
     }
 
@@ -556,7 +592,7 @@ function AccountDataPage() {
 
       return parsedDateB.getTime() - parsedDateA.getTime();
     });
-  }, [accountData, debouncedSearchTerm, searchTerm, selectedStatus, selectedMembers, startDate, endDate]);
+  }, [accountData, debouncedSearchTerm, searchTerm, selectedStatus, selectedCategory, selectedMembers, startDate, endDate]);
 
   // Replace existing filteredHistoryData with this
 
@@ -844,7 +880,7 @@ function AccountDataPage() {
 
   useEffect(() => {
     setDisplayLimit(500);
-  }, [debouncedSearchTerm, selectedStatus, selectedMembers, startDate, endDate]);
+  }, [debouncedSearchTerm, selectedStatus, selectedCategory, selectedMembers, startDate, endDate]);
 
   const displayedAccountData = useMemo(() => {
     return filteredAccountData.slice(0, displayLimit);
@@ -1032,7 +1068,15 @@ function AccountDataPage() {
     );
 
     return (
-      <div className="p-4 border-b border-purple-100 bg-gray-50">
+      <div className="p-6 border-b border-purple-100 bg-purple-50/30 relative animate-in fade-in slide-in-from-top-4 duration-300">
+        <button
+          onClick={() => setShowFilters(false)}
+          className="absolute top-4 right-4 p-1.5 rounded-full text-purple-400 hover:text-purple-600 hover:bg-purple-100 transition-colors"
+          title="Close filters"
+        >
+          <X size={18} />
+        </button>
+
         <div className="flex flex-wrap items-end justify-center gap-6">
           {/* Status Filter */}
           <div className="flex flex-col">
@@ -1047,6 +1091,23 @@ function AccountDataPage() {
               <option value="">All Status</option>
               <option value="Pending">Pending (Today Only)</option>
               <option value="Disabled">Overdue</option>
+            </select>
+          </div>
+
+          {/* Category Filter */}
+          <div className="flex flex-col">
+            <label className="text-sm font-medium text-purple-700 mb-1.5">
+              Category:
+            </label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="text-sm border border-purple-200 rounded-md p-2 min-w-[140px] focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white transition-all hover:border-purple-300"
+            >
+              <option value="">All Categories</option>
+              <option value="Today">Today</option>
+              <option value="Upcoming">Upcoming</option>
+              <option value="Overdue">Overdue</option>
             </select>
           </div>
 
@@ -1153,14 +1214,16 @@ function AccountDataPage() {
             endDate ||
             searchTerm ||
             selectedStatus ||
+            selectedCategory ||
             nameSearchTerm) && (
               <button
                 onClick={() => {
                   resetFilters();
                   setIsDropdownOpen(false);
                 }}
-                className="px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-md hover:bg-red-100 transition-all text-sm font-medium h-[38px]"
+                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-md hover:bg-red-100 transition-all text-sm font-medium h-[38px]"
               >
+                <X size={16} />
                 Clear All
               </button>
             )}
@@ -1286,7 +1349,10 @@ function AccountDataPage() {
             {/* Filters Button */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center justify-center py-2 px-4 bg-white text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-all duration-200 shadow-sm text-sm font-medium w-full sm:min-w-[100px] sm:w-auto"
+              className={`flex items-center justify-center py-2 px-4 border rounded-lg transition-all duration-200 shadow-sm text-sm font-medium w-full sm:min-w-[100px] sm:w-auto ${showFilters
+                  ? "bg-purple-100 border-purple-300 text-purple-700"
+                  : "bg-white text-purple-700 border-purple-200 hover:bg-purple-50 hover:border-purple-300"
+                }`}
             >
               <Filter className="h-4 w-4 mr-2" />
               Filters
@@ -1383,7 +1449,7 @@ function AccountDataPage() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50 sticky top-0 z-40">
                     <tr>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12 sticky left-0 z-50 bg-gray-50">
+                      <th className="px-8 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12 sticky left-0 z-50 bg-gray-50">
                         <input
                           type="checkbox"
                           className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
@@ -1421,10 +1487,7 @@ function AccountDataPage() {
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20 sticky left-12 z-50 bg-gray-50">
                         Task ID
                       </th>
-                      {/* Status Column Header */}
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px]">
-                        Status
-                      </th>
+
 
 
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
@@ -1464,6 +1527,7 @@ function AccountDataPage() {
                         onAdditionalDataChange={handleAdditionalDataChange}
                         onRemarksChange={handleRemarksChange}
                         onImageUpload={handleImageUpload}
+                        dateCategory={getDateCategory(account["col6"])}
                       />
                     ))}
 
