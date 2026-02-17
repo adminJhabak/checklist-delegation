@@ -1204,6 +1204,22 @@ export default function AssignTask() {
             mode: "no-cors",
           }
         );
+
+        // ✅ Also submit the same UNIQUE data to CHECKLIST sheet
+        const formPayloadUniqueToMain = new FormData();
+        formPayloadUniqueToMain.append("sheetName", "CHECKLIST");
+        formPayloadUniqueToMain.append("action", "insert");
+        formPayloadUniqueToMain.append("batchInsert", "true");
+        formPayloadUniqueToMain.append("rowData", JSON.stringify(tasksDataUnique));
+
+        await fetch(
+          "https://script.google.com/macros/s/AKfycbwxe45-zdY7HMvMOmYg3n05GTyn7uhscbojSJB5nQDy2nPKA5Rn9pw_EOUbGG6BSYagFA/exec",
+          {
+            method: "POST",
+            body: formPayloadUniqueToMain,
+            mode: "no-cors",
+          }
+        );
       }
 
       // Success message
