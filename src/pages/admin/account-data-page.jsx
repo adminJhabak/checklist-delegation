@@ -9,13 +9,13 @@ import AdminLayout from "../../components/layout/AdminLayout"
 const CONFIG = {
   // Google Apps Script URL
   APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbyRbhgAN0TfMUWOgZ1UPiOAsVyUrj7aDM0hOeybHvB-K7NniRVhwhH3foVs5l4u2N2z/exec",
-  
+
   // Google Drive folder ID for file uploads
   DRIVE_FOLDER_ID: "1txwq9Rhrz5G7348qPtpNX0IGPdGlw6J7",
-  
+
   // Sheet name to work with
   SHEET_NAME: "RKL",
-  
+
   // Page configuration
   PAGE_CONFIG: {
     title: "RKL Tasks",
@@ -119,10 +119,10 @@ function AccountDataPage() {
   const filteredAccountData = useMemo(() => {
     const filtered = searchTerm
       ? accountData.filter((account) =>
-          Object.values(account).some(
-            (value) => value && value.toString().toLowerCase().includes(searchTerm.toLowerCase()),
-          ),
-        )
+        Object.values(account).some(
+          (value) => value && value.toString().toLowerCase().includes(searchTerm.toLowerCase()),
+        ),
+      )
       : accountData
 
     return filtered.sort(sortDateWise)
@@ -133,8 +133,8 @@ function AccountDataPage() {
       .filter((item) => {
         const matchesSearch = searchTerm
           ? Object.values(item).some(
-              (value) => value && value.toString().toLowerCase().includes(searchTerm.toLowerCase()),
-            )
+            (value) => value && value.toString().toLowerCase().includes(searchTerm.toLowerCase()),
+          )
           : true
 
         const matchesMember = selectedMembers.length > 0 ? selectedMembers.includes(item["col4"]) : true
@@ -175,12 +175,12 @@ function AccountDataPage() {
     const memberStats =
       selectedMembers.length > 0
         ? selectedMembers.reduce((stats, member) => {
-            const memberTasks = historyData.filter((task) => task["col4"] === member).length
-            return {
-              ...stats,
-              [member]: memberTasks,
-            }
-          }, {})
+          const memberTasks = historyData.filter((task) => task["col4"] === member).length
+          return {
+            ...stats,
+            [member]: memberTasks,
+          }
+        }, {})
         : {}
     const filteredTotal = filteredHistoryData.length
 
@@ -371,10 +371,10 @@ function AccountDataPage() {
   // Fixed checkbox handlers with better state management
   const handleSelectItem = useCallback((id, isChecked) => {
     console.log(`Checkbox action: ${id} -> ${isChecked}`)
-   
+
     setSelectedItems((prev) => {
       const newSelected = new Set(prev)
-     
+
       if (isChecked) {
         newSelected.add(id)
       } else {
@@ -391,7 +391,7 @@ function AccountDataPage() {
           return newRemarksData
         })
       }
-     
+
       console.log(`Updated selection: ${Array.from(newSelected)}`)
       return newSelected
     })
@@ -424,7 +424,7 @@ function AccountDataPage() {
   const handleImageUpload = async (id, e) => {
     const file = e.target.files[0]
     if (!file) return
-   
+
     console.log(`Image upload for: ${id}`)
     setAccountData((prev) => prev.map((item) => (item._id === id ? { ...item, image: file } : item)))
   }
@@ -433,7 +433,10 @@ function AccountDataPage() {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.readAsDataURL(file)
-      reader.onload = () => resolve(reader.result)
+      reader.onload = () => {
+        const base64String = reader.result.split(",")[1]
+        resolve(base64String)
+      }
       reader.onerror = (error) => reject(error)
     })
   }
@@ -445,7 +448,7 @@ function AccountDataPage() {
 
   const handleSubmit = async () => {
     const selectedItemsArray = Array.from(selectedItems)
-   
+
     if (selectedItemsArray.length === 0) {
       alert("Please select at least one item to submit")
       return

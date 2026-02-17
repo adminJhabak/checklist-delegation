@@ -14,6 +14,9 @@ import QuickTask from "./pages/QuickTask"
 import License from "./pages/License"
 import TrainingVideo from "./pages/TrainingVideo"
 import Calendar from "./pages/Calendar"
+import ApprovePending from "./pages/admin/ApprovePending"
+import HolidayList from "./pages/HolidayList"
+import Settings from "./pages/Settings"
 
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   const username = sessionStorage.getItem("username")
@@ -82,10 +85,29 @@ function App() {
         />
 
         <Route
+          path="/dashboard/holiday-list"
+          element={
+            <ProtectedRoute>
+              <HolidayList />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/dashboard/calendar"
           element={
             <ProtectedRoute>
               <Calendar />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Approve Pending route - admin only */}
+        <Route
+          path="/dashboard/data/ApprovePending"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <ApprovePending />
             </ProtectedRoute>
           }
         />
@@ -118,6 +140,15 @@ function App() {
           }
         />
 
+        <Route
+          path="/dashboard/settings"
+          element={
+            <ProtectedRoute>
+              <Settings />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Specific route for Admin Data Page */}
         <Route
           path="/dashboard/data/admin"
@@ -135,9 +166,11 @@ function App() {
         <Route path="/admin/assign-task" element={<Navigate to="/dashboard/assign-task" replace />} />
         <Route path="/admin/data/:category" element={<Navigate to="/dashboard/data/:category" replace />} />
         <Route path="/admin/calendar" element={<Navigate to="/dashboard/calendar" replace />} />
+        <Route path="/admin/holiday-list" element={<Navigate to="/dashboard/holiday-list" replace />} />
         <Route path="/admin/license" element={<Navigate to="/dashboard/license" replace />} />
         <Route path="/admin/traning-video" element={<Navigate to="/dashboard/traning-video" replace />} />
         <Route path="/user/*" element={<Navigate to="/dashboard/admin" replace />} />
+        <Route path="/admin/settings" element={<Navigate to="/dashboard/settings" replace />} />
       </Routes>
     </Router>
   )

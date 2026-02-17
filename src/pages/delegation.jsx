@@ -5,7 +5,6 @@ import {
   Upload,
   X,
   Search,
-  History,
   ArrowLeft,
   Edit,
   Image
@@ -14,9 +13,9 @@ import AdminLayout from "../components/layout/AdminLayout";
 
 const CONFIG = {
   APPS_SCRIPT_URL:
-    "https://script.google.com/macros/s/AKfycbwpmsTlO61wAQ_1u4u0bPBFadfCqK_icPMjFNhPfv1xzAUGPFUfv4z1cXreLtfieLSn6g/exec",
+    "https://script.google.com/macros/s/AKfycbwxe45-zdY7HMvMOmYg3n05GTyn7uhscbojSJB5nQDy2nPKA5Rn9pw_EOUbGG6BSYagFA/exec",
 
-  DRIVE_FOLDER_ID: "1txwq9Rhrz5G7348qPtpNX0IGPdGlw6J7",
+  DRIVE_FOLDER_ID: "1I8srmLeAjhroTG6FonmaubYXW3Yc0lD-",
 
 
   SOURCE_SHEET_NAME: "DELEGATION",
@@ -24,10 +23,7 @@ const CONFIG = {
 
   PAGE_CONFIG: {
     title: "DELEGATION Tasks",
-    historyTitle: "DELEGATION Task History",
     description: "Showing all pending tasks",
-    historyDescription:
-      "Read-only view of completed tasks with submission history",
   },
 };
 
@@ -57,14 +53,13 @@ function DelegationDataPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [remarksData, setRemarksData] = useState({});
-  const [historyData, setHistoryData] = useState([]);
-  const [showHistory, setShowHistory] = useState(false);
   const [statusData, setStatusData] = useState({});
   const [nextTargetDate, setNextTargetDate] = useState({});
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [userRole, setUserRole] = useState("");
-  const [username, setUsername] = useState("");
+  const [userRole, setUserRole] = useState(() => (typeof window !== 'undefined' ? sessionStorage.getItem("role") || "" : ""));
+  const [username, setUsername] = useState(() => (typeof window !== 'undefined' ? sessionStorage.getItem("username") || "" : ""));
+  const [historyData, setHistoryData] = useState([]);
   const [nameFilter, setNameFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -73,12 +68,6 @@ function DelegationDataPage() {
     end: "",
   });
 
-  const [selectedHistoryItems, setSelectedHistoryItems] = useState([]);
-  const [markingAsDone, setMarkingAsDone] = useState(false);
-  const [confirmationModal, setConfirmationModal] = useState({
-    isOpen: false,
-    itemCount: 0,
-  });
   const [delegationData, setDelegationData] = useState([]);
 
   const [statusCounts, setStatusCounts] = useState({
@@ -104,7 +93,7 @@ function DelegationDataPage() {
     if (userRole === "admin") {
       return status === "Done";
     } else {
-      return status === "Done" || status === "Verify Pending";
+      return status === "Done";
     }
   }, []);
 
@@ -192,12 +181,8 @@ function DelegationDataPage() {
     }
   }, [accountData, userRole, username, nameFilter]);
 
-  useEffect(() => {
-    const role = sessionStorage.getItem("role");
-    const user = sessionStorage.getItem("username");
-    setUserRole(role || "");
-    setUsername(user || "");
-  }, []);
+  // Removed redundant role loading useEffect as states are now initialized directly
+
 
   const parseGoogleSheetsDate = useCallback(
     (dateStr) => {
@@ -313,17 +298,7 @@ function DelegationDataPage() {
     }
   }, []);
 
-  const isItemAdminDone = useCallback(
-    (historyItem) => {
-      const adminDoneValue = historyItem["col15"];
-      return (
-        !isEmpty(adminDoneValue) &&
-        (adminDoneValue.toString().trim() === "Done" ||
-          adminDoneValue.toString().toLowerCase().includes("done"))
-      );
-    },
-    [isEmpty]
-  );
+
 
   const getSubmissionStatus = useCallback(
     (taskId) => {
@@ -369,12 +344,43 @@ function DelegationDataPage() {
     [delegationData, isEmpty]
   );
 
-  const LoadingBuffer = () => (
-    <div className="absolute top-full left-0 right-0 bg-blue-50 border-t border-blue-200 z-10">
-      <div className="flex items-center justify-center py-2">
-        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500 mr-2"></div>
-        <span className="text-blue-600 text-sm">Loading data...</span>
-      </div>
+  const TableSkeleton = () => (
+    <div className="animate-pulse">
+      {[...Array(5)].map((_, i) => (
+        <tr key={i} className="border-b border-gray-100">
+          <td className="px-6 py-4"><div className="h-4 w-4 bg-gray-200 rounded"></div></td>
+          <td className="px-6 py-4"><div className="h-4 w-24 bg-gray-200 rounded"></div></td>
+          <td className="px-6 py-4"><div className="h-4 w-16 bg-gray-200 rounded"></div></td>
+          <td className="px-6 py-4"><div className="h-4 w-32 bg-gray-200 rounded"></div></td>
+          <td className="px-6 py-4"><div className="h-4 w-40 bg-gray-200 rounded"></div></td>
+          <td className="px-6 py-4"><div className="h-4 w-28 bg-gray-200 rounded"></div></td>
+          <td className="px-6 py-4"><div className="h-4 w-28 bg-gray-200 rounded"></div></td>
+          <td className="px-6 py-4"><div className="h-4 w-64 bg-gray-200 rounded"></div></td>
+          <td className="px-6 py-4"><div className="h-4 w-24 bg-gray-200 rounded"></div></td>
+          <td className="px-6 py-4 text-center"><div className="h-6 w-6 bg-gray-200 rounded-full mx-auto"></div></td>
+        </tr>
+      ))}
+    </div>
+  );
+
+  const CardSkeleton = () => (
+    <div className="space-y-4 px-4 py-4 animate-pulse">
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="bg-white rounded-lg p-4 border border-gray-100 shadow-sm space-y-4">
+          <div className="flex justify-between items-center">
+            <div className="h-4 w-1/4 bg-gray-200 rounded"></div>
+            <div className="h-6 w-20 bg-gray-200 rounded-full"></div>
+          </div>
+          <div className="space-y-2">
+            <div className="h-4 w-3/4 bg-gray-200 rounded"></div>
+            <div className="h-4 w-1/2 bg-gray-200 rounded"></div>
+          </div>
+          <div className="flex justify-between">
+            <div className="h-8 w-24 bg-gray-200 rounded"></div>
+            <div className="h-8 w-24 bg-gray-200 rounded"></div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 
@@ -472,25 +478,8 @@ function DelegationDataPage() {
       }
     });
 
-    // Add names from historyData (history table - col7)
-    historyData.forEach((item) => {
-      if (item["col7"]) {
-        const originalName = item["col7"];
-        const normalized = normalizeName(originalName);
-
-        // If user is not admin, only add their own name
-        if (userRole !== "admin" && originalName !== username) return;
-
-        // Only add if we haven't seen this normalized name before
-        if (!normalizedNames.has(normalized)) {
-          normalizedNames.set(normalized, originalName);
-          names.add(originalName); // Keep the original casing from first occurrence
-        }
-      }
-    });
-
     return Array.from(names).sort();
-  }, [accountData, historyData, userRole, username]);
+  }, [accountData, userRole, username]);
 
 
 
@@ -508,72 +497,7 @@ function DelegationDataPage() {
     });
   }, [accountData, formatDateForDisplay, parseDateFromDDMMYYYY]);
 
-  // Updated filteredHistoryData useMemo with name filter
-  const filteredHistoryData = useMemo(() => {
-    return historyData
-      .filter((item) => {
-        // User filter: For non-admin users, check column H (col7) matches username
-        const userMatch =
-          userRole === "admin" ||
-          (item["col7"] &&
-            item["col7"].toLowerCase() === username.toLowerCase());
 
-        if (!userMatch) return false;
-
-        // Name filter - apply if a name is selected (check column H - col7)
-        if (nameFilter && item["col7"].toLowerCase() !== nameFilter.toLowerCase()) {
-          return false;
-        }
-        const matchesSearch = debouncedSearchTerm
-          ? Object.values(item).some(
-            (value) =>
-              value &&
-              value
-                .toString()
-                .toLowerCase()
-                .includes(debouncedSearchTerm.toLowerCase())
-          )
-          : true;
-
-        let matchesDateRange = true;
-        if (startDate || endDate) {
-          const itemDate = parseDateFromDDMMYYYY(item["col0"]);
-          if (!itemDate) return false;
-
-          if (startDate) {
-            const startDateObj = new Date(startDate);
-            startDateObj.setHours(0, 0, 0, 0);
-            if (itemDate < startDateObj) matchesDateRange = false;
-          }
-
-          if (endDate) {
-            const endDateObj = new Date(endDate);
-            endDateObj.setHours(23, 59, 59, 999);
-            if (itemDate > endDateObj) matchesDateRange = false;
-          }
-        }
-
-        return matchesSearch && matchesDateRange;
-      })
-      .sort((a, b) => {
-        const dateStrA = a["col0"] || "";
-        const dateStrB = b["col0"] || "";
-        const dateA = parseDateFromDDMMYYYY(dateStrA);
-        const dateB = parseDateFromDDMMYYYY(dateStrB);
-        if (!dateA) return 1;
-        if (!dateB) return -1;
-        return dateB.getTime() - dateA.getTime();
-      });
-  }, [
-    historyData,
-    debouncedSearchTerm,
-    startDate,
-    endDate,
-    parseDateFromDDMMYYYY,
-    userRole,
-    username,
-    nameFilter,
-  ]); // Added nameFilter dependency
   // Optimized data fetching with parallel requests
   // Optimized data fetching with parallel requests
   const fetchSheetData = useCallback(async () => {
@@ -581,167 +505,119 @@ function DelegationDataPage() {
       setLoading(true);
       setError(null);
 
-      // Parallel fetch both sheets for better performance
-      const [mainResponse, historyResponse] = await Promise.all([
-        fetch(
-          `${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.SOURCE_SHEET_NAME}&action=fetch`
-        ),
-        fetch(
-          `${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.TARGET_SHEET_NAME}&action=fetch`
-        ).catch(() => null),
+      // Fetch both SOURCE and TARGET sheets in parallel
+      const [sourceResponse, targetResponse] = await Promise.all([
+        fetch(`${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.SOURCE_SHEET_NAME}&action=fetch`),
+        fetch(`${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.TARGET_SHEET_NAME}&action=fetch`)
       ]);
 
-      if (!mainResponse.ok) {
-        throw new Error(`Failed to fetch data: ${mainResponse.status}`);
+      if (!sourceResponse.ok || !targetResponse.ok) {
+        throw new Error(`Failed to fetch data: ${sourceResponse.status} / ${targetResponse.status}`);
       }
 
-      // Process main data
-      const mainText = await mainResponse.text();
-      let data;
-      try {
-        data = JSON.parse(mainText);
-      } catch (parseError) {
-        const jsonStart = mainText.indexOf("{");
-        const jsonEnd = mainText.lastIndexOf("}");
-        if (jsonStart !== -1 && jsonEnd !== -1) {
-          const jsonString = mainText.substring(jsonStart, jsonEnd + 1);
-          data = JSON.parse(jsonString);
-        } else {
+      const [sourceText, targetText] = await Promise.all([
+        sourceResponse.text(),
+        targetResponse.text()
+      ]);
+
+      const parseJson = (text) => {
+        try {
+          return JSON.parse(text);
+        } catch (parseError) {
+          const jsonStart = text.indexOf("{");
+          const jsonEnd = text.lastIndexOf("}");
+          if (jsonStart !== -1 && jsonEnd !== -1) {
+            return JSON.parse(text.substring(jsonStart, jsonEnd + 1));
+          }
           throw new Error("Invalid JSON response from server");
         }
-      }
+      };
 
-      // Process history data if available
-      let processedHistoryData = [];
-      if (historyResponse && historyResponse.ok) {
-        try {
-          const historyText = await historyResponse.text();
-          let historyData;
-          try {
-            historyData = JSON.parse(historyText);
-          } catch (parseError) {
-            const jsonStart = historyText.indexOf("{");
-            const jsonEnd = historyText.lastIndexOf("}");
-            if (jsonStart !== -1 && jsonEnd !== -1) {
-              const jsonString = historyText.substring(jsonStart, jsonEnd + 1);
-              historyData = JSON.parse(jsonString);
+      const sourceData = parseJson(sourceText);
+      const targetData = parseJson(targetText);
+
+      // Helper to process rows into our internal format
+      const processRows = (data, isHistory = false) => {
+        let rows = [];
+        if (data.table && data.table.rows) {
+          rows = data.table.rows;
+        } else if (Array.isArray(data)) {
+          rows = data;
+        } else if (data.values) {
+          rows = data.values.map((row) => ({
+            c: row.map((val) => ({ v: val })),
+          }));
+        }
+
+        const processedData = [];
+        rows.forEach((row, rowIndex) => {
+          if (rowIndex === 0) return;
+
+          let rowValues = [];
+          if (row.c) {
+            rowValues = row.c.map((cell) =>
+              cell && cell.v !== undefined ? cell.v : ""
+            );
+          } else if (Array.isArray(row)) {
+            rowValues = row;
+          } else {
+            return;
+          }
+
+          const googleSheetsRowIndex = rowIndex + 1;
+          const taskId = rowValues[1] || "";
+          const stableId = taskId
+            ? `${isHistory ? 'history' : 'task'}_${taskId}_${googleSheetsRowIndex}`
+            : `${isHistory ? 'hist' : 'row'}_${googleSheetsRowIndex}_${Math.random().toString(36).substring(2, 11)}`;
+
+          const rowData = {
+            _id: stableId,
+            _rowIndex: googleSheetsRowIndex,
+            _taskId: taskId,
+          };
+
+          // Map columns (21 columns for source, check target columns if different but usually similar)
+          const colLimit = isHistory ? rowValues.length : 21;
+          for (let i = 0; i < colLimit; i++) {
+            if (i === 0 || i === 6 || i === 10) {
+              rowData[`col${i}`] = rowValues[i]
+                ? parseGoogleSheetsDate(String(rowValues[i]))
+                : "";
+            } else {
+              rowData[`col${i}`] = rowValues[i] || "";
             }
           }
+          processedData.push(rowData);
+        });
+        return processedData;
+      };
 
-          if (historyData && historyData.table && historyData.table.rows) {
-            processedHistoryData = historyData.table.rows
-              .map((row, rowIndex) => {
-                if (rowIndex === 0) return null;
+      const allSourceData = processRows(sourceData);
+      const allTargetData = processRows(targetData, true);
 
-                const rowData = {
-                  _id: Math.random().toString(36).substring(2, 15),
-                  _rowIndex: rowIndex + 1,
-                };
+      setHistoryData(allTargetData);
 
-                const rowValues = row.c
-                  ? row.c.map((cell) =>
-                    cell && cell.v !== undefined ? cell.v : ""
-                  )
-                  : [];
-
-                // Map all columns including column H (col7) for user filtering, column I (col8) for Task, and column P (col15) for Admin Done
-                for (let i = 0; i < 16; i++) {
-                  if (i === 0 || i === 6 || i === 10) {
-                    rowData[`col${i}`] = rowValues[i]
-                      ? parseGoogleSheetsDate(String(rowValues[i]))
-                      : "";
-                  } else {
-                    rowData[`col${i}`] = rowValues[i] || "";
-                  }
-                }
-
-                return rowData;
-              })
-              .filter((row) => row !== null);
-          }
-        } catch (historyError) {
-          console.error("Error processing history data:", historyError);
-        }
-      }
-
-      // console.log("processedHistoryData", processedHistoryData);
-
-      setHistoryData(processedHistoryData);
-
-      // Process main delegation data - ADD USER FILTERING LOGIC
-      // Process main delegation data - ADD USER FILTERING LOGIC
-      const allDelegationData = [];
-
-      let rows = [];
-      if (data.table && data.table.rows) {
-        rows = data.table.rows;
-      } else if (Array.isArray(data)) {
-        rows = data;
-      } else if (data.values) {
-        rows = data.values.map((row) => ({
-          c: row.map((val) => ({ v: val })),
-        }));
-      }
-
-      // Inside the fetchSheetData function, update the data processing section:
-      rows.forEach((row, rowIndex) => {
-        if (rowIndex === 0) return; // Skip header row
-
-        let rowValues = [];
-        if (row.c) {
-          rowValues = row.c.map((cell) =>
-            cell && cell.v !== undefined ? cell.v : ""
-          );
-        } else if (Array.isArray(row)) {
-          rowValues = row;
-        } else {
-          return;
-        }
-
-        const googleSheetsRowIndex = rowIndex + 1;
-        const taskId = rowValues[1] || "";
-        const stableId = taskId
-          ? `task_${taskId}_${googleSheetsRowIndex}`
-          : `row_${googleSheetsRowIndex}_${Math.random()
-            .toString(36)
-            .substring(2, 15)}`;
-
-        const rowData = {
-          _id: stableId,
-          _rowIndex: googleSheetsRowIndex,
-          _taskId: taskId,
-        };
-
-        // Map all columns including timestamp (column A)
-        for (let i = 0; i < 21; i++) {
-          if (i === 0 || i === 6 || i === 10) {
-            // Column A (0), G (6), K (10) are dates
-            rowData[`col${i}`] = rowValues[i]
-              ? parseGoogleSheetsDate(String(rowValues[i]))
-              : "";
-          } else {
-            rowData[`col${i}`] = rowValues[i] || "";
-          }
-        }
-
-        // ✅ User filtering logic
-        if (userRole !== "admin") {
+      const allDelegationData = allSourceData.filter(rowData => {
+        // ✅ User filtering logic - wait for role/username to be ready
+        if (userRole && userRole !== "admin") {
           const taskAssignedTo = rowData["col4"]; // Column E (Name)
           if (
             !taskAssignedTo ||
             taskAssignedTo.toLowerCase().trim() !== username.toLowerCase().trim()
           ) {
-            return; // Skip if not assigned to this user
+            return false;
           }
+        } else if (!userRole) {
+          // If role isn't loaded yet, don't filter (or wait)
+          return false;
         }
 
         // ✅ NEW: Filter out "Done" tasks from regular view
         const taskStatus = rowData["col20"]; // Column U (Status)
         if (taskStatus && taskStatus.toString().trim().toLowerCase() === "done") {
-          return; // Skip Done tasks from regular view
+          return false;
         }
-
-        allDelegationData.push(rowData);
+        return true;
       });
 
       setAccountData(allDelegationData);
@@ -873,7 +749,11 @@ function DelegationDataPage() {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
+      reader.onload = () => {
+        // Strip the "data:image/...;base64," prefix
+        const base64String = reader.result.split(",")[1];
+        resolve(base64String);
+      };
       reader.onerror = (error) => reject(error);
     });
   }, []);
@@ -893,10 +773,7 @@ function DelegationDataPage() {
     }
   }, []);
 
-  const toggleHistory = useCallback(() => {
-    setShowHistory((prev) => !prev);
-    resetFilters();
-  }, [resetFilters]);
+
 
   const handleSubmit = async () => {
     const selectedItemsArray = Array.from(selectedItems);
@@ -1024,7 +901,7 @@ function DelegationDataPage() {
           const updateData = {
             taskId: item["col1"],
             rowIndex: existingHistoryItem._rowIndex,
-            adminDoneStatus: "Done"
+            adminDoneStatus: "Admin Done"
           };
 
           const formData = new FormData();
@@ -1153,192 +1030,14 @@ function DelegationDataPage() {
     }
   };
 
-  const handleEditRemarks = async (id, currentRemarks, historyItem) => {
-    try {
-      const formData = new FormData();
-      formData.append("sheetName", CONFIG.TARGET_SHEET_NAME);
-      formData.append("action", "update");
-      formData.append("rowIndex", historyItem._rowIndex);
-
-      // Create row data array with empty values for all columns except remarks
-      const rowData = Array(16).fill(""); // Create empty array for 16 columns
-      rowData[4] = tempRemarks[id] || currentRemarks || ""; // Column E (index 4) is remarks
-
-      formData.append("rowData", JSON.stringify(rowData));
-
-      const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      if (result.success) {
-        // Update local state
-        setHistoryData((prev) =>
-          prev.map((item) =>
-            item._id === id
-              ? { ...item, col4: tempRemarks[id] || currentRemarks || "" }
-              : item
-          )
-        );
-        setEditingRemarks((prev) => ({ ...prev, [id]: false }));
-        setSuccessMessage("Remarks updated successfully!");
-
-        // Clear temporary remarks
-        setTempRemarks((prev) => {
-          const newTemp = { ...prev };
-          delete newTemp[id];
-          return newTemp;
-        });
-      } else {
-        throw new Error(result.error || "Failed to update remarks");
-      }
-    } catch (error) {
-      console.error("Error updating remarks:", error);
-      setSuccessMessage(`Failed to update remarks: ${error.message}`);
-    }
-  };
-
   const selectedItemsCount = selectedItems.size;
-
-  // NEW: Admin functions for history management
-  const handleMarkMultipleDone = async () => {
-    if (selectedHistoryItems.length === 0) {
-      return;
-    }
-    if (markingAsDone) return;
-
-    // Open confirmation modal
-    setConfirmationModal({
-      isOpen: true,
-      itemCount: selectedHistoryItems.length,
-    });
-  };
-
-  // NEW: Confirmation modal component
-  const ConfirmationModal = ({ isOpen, itemCount, onConfirm, onCancel }) => {
-    if (!isOpen) return null;
-
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
-          <div className="flex items-center justify-center mb-4">
-            <div className="bg-yellow-100 text-yellow-600 rounded-full p-3 mr-4">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-            </div>
-            <h2 className="text-xl font-bold text-gray-800">
-              Mark Items as Admin Done
-            </h2>
-          </div>
-
-          <p className="text-gray-600 text-center mb-6">
-            Are you sure you want to mark {itemCount}{" "}
-            {itemCount === 1 ? "item" : "items"} as Admin Done?
-          </p>
-
-          <div className="flex justify-center space-x-4">
-            <button
-              onClick={onCancel}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onConfirm}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-            >
-              Confirm
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const confirmMarkDone = async () => {
-    setConfirmationModal({ isOpen: false, itemCount: 0 });
-    setMarkingAsDone(true);
-
-    try {
-      const submissionData = selectedHistoryItems.map((historyItem) => ({
-        taskId: historyItem["col1"],
-        rowIndex: historyItem._rowIndex,
-        adminDoneStatus: "Done",
-      }));
-
-      const formData = new FormData();
-      formData.append("sheetName", CONFIG.TARGET_SHEET_NAME);
-      formData.append("action", "updateAdminDone");
-      formData.append("rowData", JSON.stringify(submissionData));
-
-      const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok)
-        throw new Error(`HTTP error! status: ${response.status}`);
-
-      const result = await response.json();
-      if (result.success) {
-        // Update local state to reflect the changes without refetching
-        setHistoryData((prev) =>
-          prev.map((item) => {
-            if (
-              selectedHistoryItems.some((selected) => selected._id === item._id)
-            ) {
-              return { ...item, col15: "Done" };
-            }
-            return item;
-          })
-        );
-
-        setSuccessMessage(
-          `Successfully marked ${selectedHistoryItems.length} items as Admin Done!`
-        );
-        setSelectedHistoryItems([]);
-
-        // Refresh the data to ensure sync with sheet
-        setTimeout(() => {
-          fetchSheetData();
-        }, 1000);
-      } else {
-        throw new Error(result.error || "Failed to mark items as Admin Done");
-      }
-    } catch (error) {
-      console.error("Error marking tasks as Admin Done:", error);
-      setSuccessMessage(`Failed to mark tasks as Admin Done: ${error.message}`);
-    } finally {
-      setMarkingAsDone(false);
-    }
-  };
 
   return (
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <h1 className="text-2xl font-bold tracking-tight text-purple-700">
-            {showHistory
-              ? CONFIG.PAGE_CONFIG.historyTitle
-              : CONFIG.PAGE_CONFIG.title}
+            {CONFIG.PAGE_CONFIG.title}
           </h1>
 
           <div className="flex space-x-4">
@@ -1349,9 +1048,7 @@ function DelegationDataPage() {
               />
               <input
                 type="text"
-                placeholder={
-                  showHistory ? "Search by Task ID..." : "Search tasks..."
-                }
+                placeholder="Search tasks..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 pr-4 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -1359,51 +1056,31 @@ function DelegationDataPage() {
             </div>
 
             <button
-              onClick={toggleHistory}
+              onClick={handleSubmit}
+              disabled={selectedItemsCount === 0 || isSubmitting}
               className="w-52 gradient-bg py-3 px-4 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
-              {showHistory ? (
-                <div className="flex items-center">
-                  <ArrowLeft className="h-4 w-4 mr-1" />
-                  <span>Back to Tasks</span>
-                </div>
-              ) : (
-                <div className="flex items-center">
-                  <History className="h-4 w-4 mr-1" />
-                  <span>View History</span>
-                </div>
-              )}
+              {isSubmitting
+                ? "Processing..."
+                : `Submit Selected (${selectedItemsCount})`}
             </button>
-
-            {!showHistory && (
-              <button
-                onClick={handleSubmit}
-                disabled={selectedItemsCount === 0 || isSubmitting}
-                className="w-52 gradient-bg py-3 px-4 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-              >
-                {isSubmitting
-                  ? "Processing..."
-                  : `Submit Selected (${selectedItemsCount})`}
-              </button>
-            )}
-            {/* NEW: Admin Submit Button for History View */}
-            {showHistory &&
-              userRole === "admin" &&
-              selectedHistoryItems.length > 0 && (
-                <div className="fixed top-40 right-10 z-50">
-                  <button
-                    onClick={handleMarkMultipleDone}
-                    disabled={markingAsDone}
-                    className="rounded-md bg-green-600 text-white px-4 py-2 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {markingAsDone
-                      ? "Processing..."
-                      : `Mark ${selectedHistoryItems.length} Items as Admin Done`}
-                  </button>
-                </div>
-              )}
           </div>
         </div>
+
+        {successMessage && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md flex items-center justify-between">
+            <div className="flex items-center">
+              <CheckCircle2 className="h-5 w-5 mr-2 text-green-500" />
+              {successMessage}
+            </div>
+            <button
+              onClick={() => setSuccessMessage("")}
+              className="text-green-500 hover:text-green-700"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        )}
 
         <div className="w-full flex flex-wrap items-center gap-4 mt-4 mb-4">
           {/* Name Filter */}
@@ -1515,41 +1192,60 @@ function DelegationDataPage() {
           )}
         </div>
 
-        {successMessage && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md flex items-center justify-between">
-            <div className="flex items-center">
-              <CheckCircle2 className="h-5 w-5 mr-2 text-green-500" />
-              {successMessage}
+        {
+          successMessage && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md flex items-center justify-between">
+              <div className="flex items-center">
+                <CheckCircle2 className="h-5 w-5 mr-2 text-green-500" />
+                {successMessage}
+              </div>
+              <button
+                onClick={() => setSuccessMessage("")}
+                className="text-green-500 hover:text-green-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <button
-              onClick={() => setSuccessMessage("")}
-              className="text-green-500 hover:text-green-700"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-        )}
+          )
+        }
 
         <div className="rounded-lg border border-purple-200 shadow-md bg-white overflow-hidden">
           <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 p-4">
             <h2 className="text-purple-700 font-medium">
-              {showHistory
-                ? `Completed ${CONFIG.SOURCE_SHEET_NAME} Tasks`
-                : `Pending ${CONFIG.SOURCE_SHEET_NAME} Tasks`}
+              {`Pending ${CONFIG.SOURCE_SHEET_NAME} Tasks`}
             </h2>
             <p className="text-purple-600 text-sm">
-              {showHistory
-                ? `${CONFIG.PAGE_CONFIG.historyDescription} for ${userRole === "admin" ? "all" : "your"
-                } tasks`
-                : CONFIG.PAGE_CONFIG.description}
+              {CONFIG.PAGE_CONFIG.description}
             </p>
           </div>
 
           {loading ? (
-            <div className="text-center py-10">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500 mb-4"></div>
-              <p className="text-purple-600">Loading task data...</p>
-            </div>
+            <>
+              <div className="block md:hidden">
+                <CardSkeleton />
+              </div>
+              <div className="hidden md:block overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loading...</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remarks</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Given By</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deadline</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white">
+                    <TableSkeleton />
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : error ? (
             <div className="bg-red-50 p-4 rounded-md text-red-800 text-center">
               {error}{" "}
@@ -1560,397 +1256,6 @@ function DelegationDataPage() {
                 Try again
               </button>
             </div>
-          ) : showHistory ? (
-            <>
-              {/* Simplified History Filters - Only Date Range */}
-              <div className="p-4 border-b border-purple-100 bg-gray-50">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex flex-col">
-                    <div className="mb-2 flex items-center">
-                      <span className="text-sm font-medium text-purple-700">
-                        Filter by Date Range:
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center">
-                        <label
-                          htmlFor="start-date"
-                          className="text-sm text-gray-700 mr-1"
-                        >
-                          From
-                        </label>
-                        <input
-                          id="start-date"
-                          type="date"
-                          value={startDate}
-                          onChange={(e) => setStartDate(e.target.value)}
-                          className="text-sm border border-gray-200 rounded-md p-1"
-                        />
-                      </div>
-                      <div className="flex items-center">
-                        <label
-                          htmlFor="end-date"
-                          className="text-sm text-gray-700 mr-1"
-                        >
-                          To
-                        </label>
-                        <input
-                          id="end-date"
-                          type="date"
-                          value={endDate}
-                          onChange={(e) => setEndDate(e.target.value)}
-                          className="text-sm border border-gray-200 rounded-md p-1"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {(startDate || endDate || searchTerm) && (
-                    <button
-                      onClick={resetFilters}
-                      className="px-3 py-1 bg-red-100 text-red-700 rounded-md hover:bg-red-200 text-sm"
-                    >
-                      Clear All Filters
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* History Table */}
-              <div className="overflow-x-auto sticky top-0 max-h-[calc(100vh-300px)] overflow-y-auto">
-                <div className="min-w-full">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        {/* NEW: Submission Status Column Header */}
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px]">
-                          Edit
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Submission Status
-                        </th>
-                        {/* Admin Select Column Header */}
-                        {userRole === "admin" && (
-                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
-                            <div className="flex flex-col items-center">
-                              <input
-                                type="checkbox"
-                                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                                checked={
-                                  filteredHistoryData.filter(
-                                    (item) => !isItemAdminDone(item)
-                                  ).length > 0 &&
-                                  selectedHistoryItems.length ===
-                                  filteredHistoryData.filter(
-                                    (item) => !isItemAdminDone(item)
-                                  ).length
-                                }
-                                onChange={(e) => {
-                                  const unprocessedItems =
-                                    filteredHistoryData.filter(
-                                      (item) => !isItemAdminDone(item)
-                                    );
-                                  if (e.target.checked) {
-                                    setSelectedHistoryItems(unprocessedItems);
-                                  } else {
-                                    setSelectedHistoryItems([]);
-                                  }
-                                }}
-                              />
-                              <span className="text-xs text-gray-400 mt-1">
-                                Admin
-                              </span>
-                            </div>
-                          </th>
-                        )}
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Timestamp
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Task ID
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Task
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Remarks
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Next Target Date
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Uploaded Image
-                        </th>
-                        {userRole === "admin" && (
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            User
-                          </th>
-                        )}
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Given By
-                        </th>
-                        {userRole === "admin" && (
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 min-w-[140px]">
-                            Admin Done
-                          </th>
-                        )}
-                      </tr>
-                      {loading && <LoadingBuffer />}
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredHistoryData.length > 0 ? (
-                        filteredHistoryData.map((history) => {
-                          const isAdminDone = isItemAdminDone(history);
-                          const isSelected = selectedHistoryItems.some(
-                            (item) => item._id === history._id
-                          );
-                          const submissionStatus = getSubmissionStatus(
-                            history["col1"]
-                          ); // NEW: Get submission status
-                          console.log("submissionStatus", submissionStatus);
-
-                          return (
-                            <tr
-                              key={history._id}
-                              className={`hover:bg-gray-50 ${isAdminDone ? "opacity-70 bg-gray-100" : ""
-                                }`}
-                            >
-                              <td className="px-3 py-4 min-w-[80px]">
-                                {editingRemarks[history._id] ? (
-                                  <div className="flex space-x-2">
-                                    <button
-                                      onClick={() =>
-                                        handleEditRemarks(
-                                          history._id,
-                                          history["col4"],
-                                          history
-                                        )
-                                      }
-                                      className="text-green-600 hover:text-green-800"
-                                      title="Save"
-                                    >
-                                      <CheckCircle2 size={20} />
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        setEditingRemarks((prev) => ({
-                                          ...prev,
-                                          [history._id]: false,
-                                        }))
-                                      }
-                                      className="text-red-600 hover:text-red-800"
-                                      title="Cancel"
-                                    >
-                                      <X size={20} />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={() =>
-                                      setEditingRemarks((prev) => ({
-                                        ...prev,
-                                        [history._id]: true,
-                                      }))
-                                    }
-                                    className="text-blue-600 hover:text-blue-800"
-                                    title="Edit Remarks"
-                                  >
-                                    <Edit size={20} />
-                                  </button>
-                                )}
-                              </td>
-                              {/* NEW: Submission Status Column */}
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span
-                                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${submissionStatus.color} ${submissionStatus.textColor}`}
-                                >
-                                  {submissionStatus.status}
-                                </span>
-                              </td>
-                              {/* Admin Select Checkbox */}
-                              {userRole === "admin" && (
-                                <td className="px-3 py-4 w-12">
-                                  <div className="flex flex-col items-center">
-                                    <input
-                                      type="checkbox"
-                                      className={`h-4 w-4 rounded border-gray-300 ${isAdminDone
-                                        ? "text-green-600 bg-green-100"
-                                        : "text-green-600 focus:ring-green-500"
-                                        }`}
-                                      checked={isAdminDone || isSelected}
-                                      disabled={isAdminDone}
-                                      onChange={() => {
-                                        if (!isAdminDone) {
-                                          setSelectedHistoryItems((prev) =>
-                                            isSelected
-                                              ? prev.filter(
-                                                (item) =>
-                                                  item._id !== history._id
-                                              )
-                                              : [...prev, history]
-                                          );
-                                        }
-                                      }}
-                                    />
-                                    <span
-                                      className={`text-xs mt-1 text-center break-words ${isAdminDone
-                                        ? "text-green-600"
-                                        : "text-gray-400"
-                                        }`}
-                                    >
-                                      {isAdminDone ? "Done" : "Mark Done"}
-                                    </span>
-                                  </div>
-                                </td>
-                              )}
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">
-                                  {history["col0"] || "—"}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">
-                                  {history["col1"] || "—"}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 min-w-[250px]">
-                                <div
-                                  className="text-sm text-gray-900 max-w-md whitespace-normal break-words"
-                                  title={history["col8"]}
-                                >
-                                  {history["col8"] || "—"}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 bg-purple-50 min-w-[200px]">
-                                {editingRemarks[history._id] ? (
-                                  <input
-                                    type="text"
-                                    defaultValue={history["col4"] || ""}
-                                    onChange={(e) =>
-                                      setTempRemarks((prev) => ({
-                                        ...prev,
-                                        [history._id]: e.target.value,
-                                      }))
-                                    }
-                                    className="border rounded-md px-2 py-1 w-full text-sm"
-                                    autoFocus
-                                  />
-                                ) : (
-                                  <span className="text-sm text-gray-900 max-w-md whitespace-normal break-words">
-                                    {history["col4"] || "—"}
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span
-                                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${history["col2"] === "Done"
-                                    ? "bg-green-100 text-green-800"
-                                    : history["col2"] === "Extend date"
-                                      ? "bg-yellow-100 text-yellow-800"
-                                      : "bg-gray-100 text-gray-800"
-                                    }`}
-                                >
-                                  {history["col2"] || "—"}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">
-                                  {formatDateForDisplay(history["col3"]) || "—"}
-                                </div>
-                              </td>
-                              {/* <td className="px-6 py-4 bg-purple-50 min-w-[200px]">
-                              <div
-                                className="text-sm text-gray-900 max-w-md whitespace-normal break-words"
-                                title={history["col4"]}
-                              >
-                                {history["col4"] || "—"}
-                              </div>
-                            </td> */}
-
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {history["col5"] ? (
-                                  <a
-                                    href={history["col5"]}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 hover:text-blue-800 underline flex items-center"
-                                  >
-                                    <img
-                                      src={
-                                        history["col5"] ||
-                                        "/api/placeholder/32/32"
-                                      }
-                                      alt="Attachment"
-                                      className="h-8 w-8 object-cover rounded-md mr-2"
-                                    />
-                                    View
-                                  </a>
-                                ) : (
-                                  <span className="text-gray-400">
-                                    No attachment
-                                  </span>
-                                )}
-                              </td>
-                              {userRole === "admin" && (
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-sm text-gray-900">
-                                    {history["col7"] || "—"}
-                                  </div>
-                                </td>
-                              )}
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">
-                                  {history["col9"] || "—"}
-                                </div>
-                              </td>
-                              {userRole === "admin" && (
-                                <td className="px-6 py-4 bg-gray-50 min-w-[140px]">
-                                  {isAdminDone ? (
-                                    <div className="text-sm text-gray-900 break-words">
-                                      <div className="flex items-center">
-                                        <div className="h-4 w-4 rounded border-gray-300 text-green-600 bg-green-100 mr-2 flex items-center justify-center">
-                                          <span className="text-xs text-green-600">
-                                            ✓
-                                          </span>
-                                        </div>
-                                        <div className="flex flex-col">
-                                          <div className="font-medium text-green-700 text-sm">
-                                            Done
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center text-gray-400 text-sm">
-                                      <div className="h-4 w-4 rounded border-gray-300 mr-2"></div>
-                                      <span>Pending</span>
-                                    </div>
-                                  )}
-                                </td>
-                              )}
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td
-                            colSpan={userRole === "admin" ? 12 : 9}
-                            className="px-6 py-4 text-center text-gray-500"
-                          >
-                            {searchTerm || startDate || endDate
-                              ? "No historical records matching your filters"
-                              : "No completed records found"}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
           ) : (
             <>
               {/* Mobile Card View */}
@@ -1978,9 +1283,6 @@ function DelegationDataPage() {
                                 disabled={isTaskDisabled(account["col20"], userRole)}
                               />
                               <div className="flex flex-col">
-                                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(account["col20"])}`}>
-                                  {account["col20"] || "—"}
-                                </span>
                                 <span className="text-xs text-gray-500 mt-1">ID: {account["col1"] || "—"}</span>
                               </div>
                             </div>
@@ -2050,52 +1352,30 @@ function DelegationDataPage() {
 
                           <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
                             <div>
-                              {account["col20"] === "Verify Pending" ? (
-                                <div className="flex items-center gap-2">
-                                  {account["col15"] ? (
-                                    <>
-                                      <a
-                                        href={account["col15"]}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                      >
-                                        <img
-                                          src={account["col15"]}
-                                          alt="Proof"
-                                          className="h-10 w-10 object-cover rounded-md"
-                                          onError={(e) => {
-                                            e.target.onerror = null;
-                                            e.target.src =
-                                              "https://placehold.co/40x40?text=IMG";
-                                          }}
-                                        />
-                                      </a>
-                                      <a
-                                        href={account["col15"]}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs text-purple-600 underline"
-                                      >
-                                        View
-                                      </a>
-                                    </>
-                                  ) : (
-                                    <span className="text-xs text-gray-400">
-                                      No Proof
-                                    </span>
-                                  )}
-                                </div>
-                              ) : account.image ? (
+                              {account.image ? (
                                 <div className="flex items-center gap-2">
                                   <img src={typeof account.image === "string" ? account.image : URL.createObjectURL(account.image)} alt="Receipt" className="h-10 w-10 object-cover rounded-md" />
                                   <div className="text-xs text-gray-600">{account.image instanceof File ? "Ready to upload" : <button className="text-purple-600" onClick={() => window.open(account.image, "_blank")}>View</button>}</div>
                                 </div>
                               ) : (
-                                <label className={`flex items-center cursor-pointer text-xs text-purple-600 hover:text-purple-800`}>
-                                  <Upload className="h-4 w-4 mr-1" />
-                                  <span>{account["col9"]?.toUpperCase() === "YES" ? "Required Upload" : "Upload Image"}</span>
-                                  <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(account._id, e)} disabled={!isSelected || isTaskDisabled(account["col20"], userRole)} />
-                                </label>
+                                <div className="flex items-center gap-2">
+                                  {account["col15"] && (
+                                    <a
+                                      href={account["col15"]}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-purple-600"
+                                      title="View existing proof"
+                                    >
+                                      <Image size={24} />
+                                    </a>
+                                  )}
+                                  <label className={`flex items-center cursor-pointer text-xs text-purple-600 hover:text-purple-800`}>
+                                    <Upload className="h-4 w-4 mr-1" />
+                                    <span>{account["col9"]?.toUpperCase() === "YES" ? "Required Upload" : "Upload Image"}</span>
+                                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(account._id, e)} disabled={!isSelected} />
+                                  </label>
+                                </div>
                               )}
                             </div>
                             <div className="text-xs text-gray-500">{account["col2"] || "—"}</div>
@@ -2137,9 +1417,6 @@ function DelegationDataPage() {
                           />
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Task Start Date
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -2149,8 +1426,7 @@ function DelegationDataPage() {
                           Department
                         </th>
                         <th
-                          className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${!accountData["col17"] ? "bg-purple-50" : ""
-                            }`}
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           Remarks
                         </th>
@@ -2164,37 +1440,31 @@ function DelegationDataPage() {
                           Task Description
                         </th>
                         <th
-                          className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${!accountData["col17"] ? "bg-yellow-50" : ""
-                            }`}
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           Old Deadline Date
                         </th>
                         <th
-                          className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${!accountData["col17"] ? "bg-green-50" : ""
-                            }`}
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           New Deadline Date
                         </th>
                         <th
-                          className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${!accountData["col17"] ? "bg-blue-50" : ""
-                            }`}
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           Status
                         </th>
                         <th
-                          className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${!accountData["col17"] ? "bg-indigo-50" : ""
-                            }`}
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           Next Target Date
                         </th>
                         <th
-                          className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${!accountData["col17"] ? "bg-orange-50" : ""
-                            }`}
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           Upload Image
                         </th>
                       </tr>
-                      {loading && <LoadingBuffer />}
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {filteredAccountData.length > 0 ? (
@@ -2223,15 +1493,6 @@ function DelegationDataPage() {
                                     userRole
                                   )}
                                 />
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span
-                                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
-                                    account["col20"]
-                                  )}`}
-                                >
-                                  {account["col20"] || "—"}
-                                </span>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900">
@@ -2281,7 +1542,7 @@ function DelegationDataPage() {
                               </td>
                               <td className="px-6 py-4 min-w-[250px]">
                                 <div
-                                  className="text-sm text-gray-900 max-w-md whitespace-normal break-words"
+                                  className="text-sm text-gray-900 max-w-md whitespace-normal wrap-break-word"
                                   title={account["col5"]}
                                 >
                                   {account["col5"] || "—"}
@@ -2373,28 +1634,7 @@ function DelegationDataPage() {
                                 className={`px-6 py-4 whitespace-nowrap ${!account["col17"] ? "bg-orange-50" : ""
                                   }`}
                               >
-                                {account["col20"] === "Verify Pending" ? (
-                                  <div className="flex items-center">
-                                    {account["col15"] ? (
-                                      <>
-                                        <div className="flex flex-col">
-                                          <a
-                                            href={account["col15"]}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-xs text-purple-600 hover:text-purple-800 underline"
-                                          >
-                                            <Image size={24} />
-                                          </a>
-                                        </div>
-                                      </>
-                                    ) : (
-                                      <span className="text-xs text-gray-400">
-                                        No Proof
-                                      </span>
-                                    )}
-                                  </div>
-                                ) : account.image ? (
+                                {account.image ? (
                                   <div className="flex items-center">
                                     <img
                                       src={
@@ -2406,7 +1646,6 @@ function DelegationDataPage() {
                                       className="h-10 w-10 object-cover rounded-md mr-2"
                                     />
                                     <div className="flex flex-col">
-                                      {/* <span className="text-xs text-gray-500"> */}
                                       {account.image instanceof File ? (
                                         <span className="text-xs text-green-600">
                                           Ready to upload
@@ -2424,34 +1663,41 @@ function DelegationDataPage() {
                                     </div>
                                   </div>
                                 ) : (
-                                  <label
-                                    className={`flex items-center cursor-pointer ${account["col9"]?.toUpperCase() === "YES"
-                                      ? "text-red-600 font-medium"
-                                      : "text-purple-600"
-                                      } hover:text-purple-800`}
-                                  >
-                                    <Upload className="h-4 w-4 mr-1" />
-                                    <span className="text-xs">
-                                      {account["col9"]?.toUpperCase() === "YES"
-                                        ? "Required Upload"
-                                        : "Upload Image"}
-                                      {account["col9"]?.toUpperCase() === "YES" && (
-                                        <span className="text-red-500 ml-1">*</span>
-                                      )}
-                                    </span>
-                                    <input
-                                      type="file"
-                                      className="hidden"
-                                      accept="image/*"
-                                      onChange={(e) =>
-                                        handleImageUpload(account._id, e)
-                                      }
-                                      disabled={
-                                        !isSelected ||
-                                        isTaskDisabled(account["col20"], userRole)
-                                      }
-                                    />
-                                  </label>
+                                  <div className="flex items-center space-x-2">
+                                    {account["col15"] && (
+                                      <a
+                                        href={account["col15"]}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-purple-600 hover:text-purple-800"
+                                        title="View existing proof"
+                                      >
+                                        <Image size={20} />
+                                      </a>
+                                    )}
+                                    <label
+                                      className={`flex items-center cursor-pointer ${account["col9"]?.toUpperCase() === "YES"
+                                        ? "text-red-600 font-medium"
+                                        : "text-purple-600"
+                                        } hover:text-purple-800`}
+                                    >
+                                      <Upload className="h-4 w-4 mr-1" />
+                                      <span className="text-xs">
+                                        {account["col9"]?.toUpperCase() === "YES"
+                                          ? "Required Upload"
+                                          : "Upload Image"}
+                                      </span>
+                                      <input
+                                        type="file"
+                                        className="hidden"
+                                        accept="image/*"
+                                        onChange={(e) =>
+                                          handleImageUpload(account._id, e)
+                                        }
+                                        disabled={!isSelected}
+                                      />
+                                    </label>
+                                  </div>
                                 )}
                               </td>
                             </tr>
@@ -2460,7 +1706,7 @@ function DelegationDataPage() {
                       ) : (
                         <tr>
                           <td
-                            colSpan={13}
+                            colSpan={14}
                             className="px-6 py-4 text-center text-gray-500"
                           >
                             {searchTerm
@@ -2476,14 +1722,8 @@ function DelegationDataPage() {
             </>
           )}
         </div>
-        <ConfirmationModal
-          isOpen={confirmationModal.isOpen}
-          itemCount={confirmationModal.itemCount}
-          onConfirm={confirmMarkDone}
-          onCancel={() => setConfirmationModal({ isOpen: false, itemCount: 0 })}
-        />
       </div>
-    </AdminLayout>
+    </AdminLayout >
   );
 }
 

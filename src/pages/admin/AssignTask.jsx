@@ -37,8 +37,7 @@ const TaskTypePopup = ({ isOpen, onClose, onSelect }) => {
           >
             <div className="font-medium text-purple-700">Delegation Task</div>
             <div className="text-sm text-purple-600 mt-1">
-              Only for 'One-Time', 'Critical' and 'Urgent' frequency.
-              sheet.
+              Only for 'One-Time' frequency. Tasks will be stored in the Delegation sheet.
             </div>
           </button>
         </div>
@@ -188,7 +187,7 @@ const addYears = (date, years) => {
 };
 
 export default function AssignTask() {
-  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwpmsTlO61wAQ_1u4u0bPBFadfCqK_icPMjFNhPfv1xzAUGPFUfv4z1cXreLtfieLSn6g/exec";
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwxe45-zdY7HMvMOmYg3n05GTyn7uhscbojSJB5nQDy2nPKA5Rn9pw_EOUbGG6BSYagFA/exec";
   // const [showTaskTypePopup, setShowTaskTypePopup] = useState(true);
   const [selectedTaskType, setSelectedTaskType] = useState(null);
   const [date, setSelectedDate] = useState(null);
@@ -202,6 +201,7 @@ export default function AssignTask() {
   const [departmentOptions, setDepartmentOptions] = useState([]);
   const [givenByOptions, setGivenByOptions] = useState([]);
   const [doerOptions, setDoerOptions] = useState([]);
+  const [lastUniqueDate, setLastUniqueDate] = useState(null); // State for Last Date from UNIQUE sheet
 
   const browserSupportsSpeechRecognition = SpeechRecognition.browserSupportsSpeechRecognition();
   const [isMicrophoneAvailable, setIsMicrophoneAvailable] = useState(true);
@@ -217,9 +217,7 @@ export default function AssignTask() {
   const getFrequencies = () => {
     if (selectedTaskType === "delegation") {
       return [
-        { value: "one-time", label: "One Time" },
-        { value: "critical", label: "Critical" },
-        { value: "urgent", label: "Urgent" }
+        { value: "one-time", label: "One Time" }
       ];
     } else {
       return [
@@ -552,6 +550,15 @@ export default function AssignTask() {
     if (selectedTaskType) {
       const today = new Date();
       setSelectedDate(today);
+
+      // Fetch data from UNIQUE sheet if checklist type
+      if (selectedTaskType === "checklist") {
+        const fetchDate = async () => {
+          const lDate = await getLastUniqueDate();
+          if (lDate) setLastUniqueDate(lDate);
+        };
+        fetchDate();
+      }
     }
   }, [selectedTaskType]);
 
@@ -584,6 +591,53 @@ export default function AssignTask() {
     } catch (error) {
       console.error("Error fetching last task ID:", error);
       return 0;
+    }
+  };
+
+  // NEW: Function to get the last date from Column Q (index 16) of the UNIQUE sheet
+  const getLastUniqueDate = async () => {
+    try {
+      const sheetName = "UNIQUE";
+      const response = await fetch(`${APPS_SCRIPT_URL}?action=fetch&sheet=${encodeURIComponent(sheetName)}`);
+
+      if (!response.ok) {
+        console.error(`Failed to fetch UNIQUE sheet data: ${response.status}`);
+        return null;
+      }
+
+      const data = await response.json();
+
+      if (!data.table || !data.table.rows || data.table.rows.length === 0) {
+        return null;
+      }
+
+      // Get the last row
+      const lastRow = data.table.rows[data.table.rows.length - 1];
+
+      // Check column Q (index 16) - Adjust index if needed based on 0-indexing (A=0, ..., Q=16)
+      if (lastRow.c && lastRow.c.length > 16 && lastRow.c[16] && lastRow.c[16].v) {
+        let lastDateVal = lastRow.c[16].v;
+        console.log("Last Date from UNIQUE sheet (Column Q):", lastDateVal);
+
+        // Handle Date string format if necessary
+        if (typeof lastDateVal === "string" && lastDateVal.startsWith("Date(")) {
+          // Basic parsing if it comes as Date(year, month, day)
+          const match = /Date\((\d+),(\d+),(\d+)\)/.exec(lastDateVal);
+          if (match) {
+            const year = parseInt(match[1], 10);
+            const month = parseInt(match[2], 10) + 1;
+            const day = parseInt(match[3], 10);
+            lastDateVal = `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+          }
+        }
+
+        return lastDateVal;
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Error fetching last unique date:", error);
+      return null;
     }
   };
 
@@ -1015,7 +1069,7 @@ export default function AssignTask() {
       );
 
       await fetch(
-        "https://script.google.com/macros/s/AKfycbwpmsTlO61wAQ_1u4u0bPBFadfCqK_icPMjFNhPfv1xzAUGPFUfv4z1cXreLtfieLSn6g/exec",
+        "https://script.google.com/macros/s/AKfycbwxe45-zdY7HMvMOmYg3n05GTyn7uhscbojSJB5nQDy2nPKA5Rn9pw_EOUbGG6BSYagFA/exec",
         {
           method: "POST",
           body: formPayload,
@@ -1053,7 +1107,7 @@ export default function AssignTask() {
       if (formData.taskType === "delegation") {
         submitSheetName = "DELEGATION";
       } else {
-        submitSheetName = "UNIQUE";
+        submitSheetName = "CHECKLIST";
       }
 
       // Check if selected date is today
@@ -1109,7 +1163,7 @@ export default function AssignTask() {
       formPayloadMain.append("rowData", JSON.stringify(tasksDataMain));
 
       await fetch(
-        "https://script.google.com/macros/s/AKfycbwpmsTlO61wAQ_1u4u0bPBFadfCqK_icPMjFNhPfv1xzAUGPFUfv4z1cXreLtfieLSn6g/exec",
+        "https://script.google.com/macros/s/AKfycbwxe45-zdY7HMvMOmYg3n05GTyn7uhscbojSJB5nQDy2nPKA5Rn9pw_EOUbGG6BSYagFA/exec",
         {
           method: "POST",
           body: formPayloadMain,
@@ -1117,55 +1171,52 @@ export default function AssignTask() {
         }
       );
 
-      // ✅ Submit to UNIQUE sheet only if:
-      // 1. Task type is "checklist" AND 
-      // 2. Frequency is NOT "one-time", "critical", or "urgent"
-      const isDelegationFrequency = ["one-time", "critical", "urgent"].includes(formData.frequency);
+      // ✅ Submit to UNIQUE sheet for checklist tasks
+      if (formData.taskType === "checklist") {
+        const lastTaskIdUnique = await getLastTaskId("UNIQUE");
+        let nextTaskIdUnique = lastTaskIdUnique + 1;
 
-      // if (formData.taskType === "checklist" && !isDelegationFrequency) {
-      //   const lastTaskIdUnique = await getLastTaskId("UNIQUE");
-      //   let nextTaskIdUnique = lastTaskIdUnique + 1;
+        const tasksDataUnique = tasksToSubmit.map((task, index) => ({
+          timestamp: getCurrentTimestamp(),
+          taskId: (nextTaskIdUnique + index).toString(),
+          firm: task.department,
+          givenBy: task.givenBy,
+          name: task.doer,
+          description: task.description,
+          startDate: task.dueDate,
+          freq: task.frequency,
+          enableReminders: task.enableReminders ? "Yes" : "No",
+          requireAttachment: task.requireAttachment ? "Yes" : "No",
+          lastDate: task.dueDate, // Send date for Column Q
+        }));
 
-      //   const tasksDataUnique = tasksToSubmit.map((task, index) => ({
-      //     timestamp: getCurrentTimestamp(),
-      //     taskId: (nextTaskIdUnique + index).toString(),
-      //     firm: task.department,
-      //     givenBy: task.givenBy,
-      //     name: task.doer,
-      //     description: task.description,
-      //     startDate: task.dueDate,
-      //     freq: task.frequency,
-      //     enableReminders: task.enableReminders ? "Yes" : "No",
-      //     requireAttachment: task.requireAttachment ? "Yes" : "No",
-      //   }));
+        const formPayloadUnique = new FormData();
+        formPayloadUnique.append("sheetName", "UNIQUE");
+        formPayloadUnique.append("action", "insert");
+        formPayloadUnique.append("batchInsert", "true");
+        formPayloadUnique.append("rowData", JSON.stringify(tasksDataUnique));
 
-      //   const formPayloadUnique = new FormData();
-      //   formPayloadUnique.append("sheetName", "UNIQUE");
-      //   formPayloadUnique.append("action", "insert");
-      //   formPayloadUnique.append("batchInsert", "true");
-      //   formPayloadUnique.append("rowData", JSON.stringify(tasksDataUnique));
-
-      //   await fetch(
-      //     "https://script.google.com/macros/s/AKfycbwpmsTlO61wAQ_1u4u0bPBFadfCqK_icPMjFNhPfv1xzAUGPFUfv4z1cXreLtfieLSn6g/exec",
-      //     {
-      //       method: "POST",
-      //       body: formPayloadUnique,
-      //       mode: "no-cors",
-      //     }
-      //   );
-      // }
+        await fetch(
+          "https://script.google.com/macros/s/AKfycbwxe45-zdY7HMvMOmYg3n05GTyn7uhscbojSJB5nQDy2nPKA5Rn9pw_EOUbGG6BSYagFA/exec",
+          {
+            method: "POST",
+            body: formPayloadUnique,
+            mode: "no-cors",
+          }
+        );
+      }
 
       // Success message
       const taskCount = tasksToSubmit.length;
       let successMessage = `Successfully submitted ${taskCount} task(s) to ${submitSheetName}`;
 
-      if (formData.taskType === "checklist" && !isDelegationFrequency) {
+      if (formData.taskType === "checklist") {
         successMessage += ` and UNIQUE sheets!`;
       }
       if (isToday()) {
         successMessage =
           `Today's date selected - submitted ${taskCount} task(s) to ${submitSheetName}` +
-          (formData.taskType === "checklist" && !isDelegationFrequency ? " and UNIQUE sheets!" : "!");
+          (formData.taskType === "checklist" ? " and UNIQUE sheets!" : "!");
       }
 
       // alert(successMessage);
@@ -1469,8 +1520,10 @@ export default function AssignTask() {
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-purple-700">
                         Task Deadline Date
-                        {(selectedTaskType === "delegation" && (formData.frequency === "critical" || formData.frequency === "urgent")) && (
-                          <span className="text-xs text-purple-600 ml-1"></span>
+                        {selectedTaskType === "checklist" && lastUniqueDate && (
+                          <span className="block text-xs text-amber-600 font-normal mt-0.5">
+                            (Last Task Date in UNIQUE Sheet: {lastUniqueDate})
+                          </span>
                         )}
                       </label>
                       <div className="relative">
@@ -1649,11 +1702,9 @@ export default function AssignTask() {
                           >
                             <span className="font-medium">
                               {generatedTasks.length} Tasks Generated
-                              {formData.frequency === "one-time" ||
-                                formData.frequency === "critical" ||
-                                formData.frequency === "urgent"
-                                ? " (Will be stored in DELEGATION sheet)"
-                                : ` (Will be stored in Unique sheet)`}
+                              {formData.taskType === "checklist"
+                                ? " (Will be stored in CHECKLIST and UNIQUE sheets)"
+                                : ` (Will be stored in DELEGATION sheet)`}
                             </span>
                             <svg
                               className={`w-5 h-5 transition-transform ${accordionOpen ? "rotate-180" : ""

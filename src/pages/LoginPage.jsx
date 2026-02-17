@@ -42,7 +42,7 @@ const LoginPage = () => {
   useEffect(() => {
     const fetchMasterData = async () => {
       const SCRIPT_URL =
-        "https://script.google.com/macros/s/AKfycbwpmsTlO61wAQ_1u4u0bPBFadfCqK_icPMjFNhPfv1xzAUGPFUfv4z1cXreLtfieLSn6g/exec";
+        "https://script.google.com/macros/s/AKfycbwxe45-zdY7HMvMOmYg3n05GTyn7uhscbojSJB5nQDy2nPKA5Rn9pw_EOUbGG6BSYagFA/exec";
 
       try {
         setIsDataLoading(true);
@@ -147,7 +147,7 @@ const LoginPage = () => {
 
   const logAttendance = async (username, role) => {
     const SCRIPT_URL =
-      "https://script.google.com/macros/s/AKfycbwpmsTlO61wAQ_1u4u0bPBFadfCqK_icPMjFNhPfv1xzAUGPFUfv4z1cXreLtfieLSn6g/exec";
+      "https://script.google.com/macros/s/AKfycbwxe45-zdY7HMvMOmYg3n05GTyn7uhscbojSJB5nQDy2nPKA5Rn9pw_EOUbGG6BSYagFA/exec";
     const SPREADSHEET_ID = "1r3YHyjqv24gZXBI9IofAhodnlBuDTA3sgyzU_PNCaQg";
 
     try {

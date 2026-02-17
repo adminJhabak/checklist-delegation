@@ -26,7 +26,7 @@ export default function QuickTask() {
 
   const CONFIG = {
     SHEET_ID: "1r3YHyjqv24gZXBI9IofAhodnlBuDTA3sgyzU_PNCaQg",
-    APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwpmsTlO61wAQ_1u4u0bPBFadfCqK_icPMjFNhPfv1xzAUGPFUfv4z1cXreLtfieLSn6g/exec",
+    APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwxe45-zdY7HMvMOmYg3n05GTyn7uhscbojSJB5nQDy2nPKA5Rn9pw_EOUbGG6BSYagFA/exec",
     WHATSAPP_SHEET: "Whatsapp", // For login credentials and user roles
     CHECKLIST_SHEET: "Checklist", // For unique checklist tasks
     DELEGATION_SHEET: "Delegation", // For delegation tasks
@@ -413,7 +413,7 @@ export default function QuickTask() {
               >
                 Checklist
               </button>
-              <button
+              {/* <button
                 className={`px-4 py-2 text-sm font-medium transition-colors duration-300 ${activeTab === "delegation"
                   ? "bg-purple-600 text-white"
                   : "bg-white text-purple-600 hover:bg-purple-50"
@@ -421,7 +421,7 @@ export default function QuickTask() {
                 onClick={() => setActiveTab("delegation")}
               >
                 Delegation
-              </button>
+              </button> */}
             </div>
 
             <div className="relative flex-1 min-w-[200px]">

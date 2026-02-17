@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import { CheckSquare, ClipboardList, Home, LogOut, Menu, Database, ChevronDown, ChevronRight, Zap, FileText, X, Play, Pause, KeyRound, Video, Calendar } from 'lucide-react'
+import { CheckSquare, ClipboardList, ClipboardCheck, Home, LogOut, Menu, Database, ChevronDown, ChevronRight, Zap, FileText, X, Play, Pause, KeyRound, Video, Calendar, Settings } from 'lucide-react'
 
 
 export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
@@ -76,6 +76,13 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
       active: location.pathname === "/dashboard/assign-task",
       showFor: ["admin"] // Only show for admin
     },
+     {
+      href: "/dashboard/quick-task",
+      label: "Unique Task",
+      icon: Zap,
+      active: location.pathname === "/dashboard/quick-task",
+      showFor: ["admin", "user"] // Only show for admin
+    },
     {
       href: "/dashboard/delegation",
       label: "Delegation",
@@ -91,18 +98,26 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
       showFor: ["admin", "user"] // Show for both roles
     },
     {
-      href: "/dashboard/quick-task",
-      label: "Unique Task",
-      icon: Zap,
-      active: location.pathname === "/dashboard/quick-task",
-      showFor: ["admin", "user"] // Only show for admin
+      href: "/dashboard/data/ApprovePending",
+      label: "Approve Pending",
+      icon: ClipboardCheck,
+      active: location.pathname === "/dashboard/data/ApprovePending",
+      showFor: ["admin"] // Admin only
     },
+   
     {
       href: "/dashboard/calendar",
       label: "Calendar",
       icon: Calendar,
       active: location.pathname === "/dashboard/calendar",
       showFor: ["admin", "user"] // Show for both roles
+    },
+    {
+      href: "/dashboard/holiday-list",
+      label: "Holiday List",
+      icon: Calendar,
+      active: location.pathname === "/dashboard/holiday-list",
+      showFor: ["admin", "user"]
     },
     {
       href: "/dashboard/license",
@@ -118,6 +133,13 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
       active: location.pathname === "/dashboard/traning-video",
       showFor: ["admin", "user"] //  show both
     },
+    {
+      href: "/dashboard/settings",
+      label: "Settings",
+      icon: Settings,
+      active: location.pathname === "/dashboard/settings",
+      showFor: ["admin", "user"] //  show both
+    }
   ]
 
   const getAccessibleDepartments = () => {

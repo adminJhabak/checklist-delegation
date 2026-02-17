@@ -1,23 +1,21 @@
 "use client"
 import { useState, useEffect, useCallback, useMemo, memo } from "react"
-import { CheckCircle2, Upload, X, Search, History, ArrowLeft, Filter, Edit } from "lucide-react"
+import { CheckCircle2, Upload, X, Search, ArrowLeft, Filter, Edit } from "lucide-react"
 import AdminLayout from "../../components/layout/AdminLayout"
 
 // Configuration object - Move all configurations here
 const CONFIG = {
   // Google Apps Script URL
   APPS_SCRIPT_URL:
-    "https://script.google.com/macros/s/AKfycbwpmsTlO61wAQ_1u4u0bPBFadfCqK_icPMjFNhPfv1xzAUGPFUfv4z1cXreLtfieLSn6g/exec",
+    "https://script.google.com/macros/s/AKfycbwxe45-zdY7HMvMOmYg3n05GTyn7uhscbojSJB5nQDy2nPKA5Rn9pw_EOUbGG6BSYagFA/exec",
   // Google Drive folder ID for file uploads
-  DRIVE_FOLDER_ID: "1txwq9Rhrz5G7348qPtpNX0IGPdGlw6J7",
+  DRIVE_FOLDER_ID: "1UFMuMSHb_r9bEPWpwliX6Y563XmneecC",
   // Sheet name to work with
   SHEET_NAME: "Checklist",
   // Page configuration
   PAGE_CONFIG: {
     title: "Checklist Tasks",
-    historyTitle: "Checklist Task History",
     description: "Showing both completed and pending tasks for today, tomorrow, and past due dates",
-    historyDescription: "Read-only view of completed tasks with submission history (excluding admin-processed items)",
   },
 }
 
@@ -274,8 +272,6 @@ function AccountDataPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [remarksData, setRemarksData] = useState({})
-  const [historyData, setHistoryData] = useState([])
-  const [showHistory, setShowHistory] = useState(false)
   const [membersList, setMembersList] = useState([])
   const [selectedMembers, setSelectedMembers] = useState([])
   const [startDate, setStartDate] = useState("")
@@ -285,22 +281,9 @@ function AccountDataPage() {
   const [selectedStatus, setSelectedStatus] = useState("") // New filter for status
   const [showFilters, setShowFilters] = useState(false) // Toggle for filter section
   const [nameSearchTerm, setNameSearchTerm] = useState("") // Search term for name dropdown
-  const [editingRemarks, setEditingRemarks] = useState({});
-  const [tempRemarks, setTempRemarks] = useState({});
   const [displayLimit, setDisplayLimit] = useState(50)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const [historyDisplayLimit, setHistoryDisplayLimit] = useState(500)
-  const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false)
-
-
-  // Admin history selection states
-  const [selectedHistoryItems, setSelectedHistoryItems] = useState([])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [markingAsDone, setMarkingAsDone] = useState(false)
-  const [confirmationModal, setConfirmationModal] = useState({
-    isOpen: false,
-    itemCount: 0,
-  })
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
   // Function to determine submission status
   useEffect(() => {
@@ -317,54 +300,7 @@ function AccountDataPage() {
   }, [isDropdownOpen]);
 
 
-  const handleEditRemarks = async (id, currentRemarks, historyItem) => {
-    try {
-      const formData = new FormData();
-      formData.append("sheetName", CONFIG.SHEET_NAME);
-      formData.append("action", "update");
-      formData.append("rowIndex", historyItem._rowIndex);
 
-      // Create row data array with empty values for all columns except remarks
-      const rowData = Array(15).fill(""); // Create empty array for 15 columns
-      rowData[13] = tempRemarks[id] || currentRemarks || ""; // Column N (index 13) is remarks
-
-      formData.append("rowData", JSON.stringify(rowData));
-
-      const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      if (result.success) {
-        // Update local state
-        setHistoryData(prev =>
-          prev.map(item =>
-            item._id === id ? { ...item, col13: tempRemarks[id] || currentRemarks || "" } : item
-          )
-        );
-        setEditingRemarks(prev => ({ ...prev, [id]: false }));
-        setSuccessMessage("Remarks updated successfully!");
-
-        // Clear temporary remarks
-        setTempRemarks(prev => {
-          const newTemp = { ...prev };
-          delete newTemp[id];
-          return newTemp;
-        });
-      } else {
-        throw new Error(result.error || "Failed to update remarks");
-      }
-    } catch (error) {
-      console.error("Error updating remarks:", error);
-      setSuccessMessage(`Failed to update remarks: ${error.message}`);
-    }
-  };
 
   const formatDateTimeToDDMMYYYY = useCallback((date) => {
     const day = date.getDate().toString().padStart(2, "0")
@@ -479,117 +415,12 @@ function AccountDataPage() {
   }, [])
 
   // Admin functions for history management
-  const handleMarkMultipleDone = async () => {
-    if (selectedHistoryItems.length === 0) {
-      return
-    }
-    if (markingAsDone) return
 
-    // Open confirmation modal
-    setConfirmationModal({
-      isOpen: true,
-      itemCount: selectedHistoryItems.length,
-    })
-  }
 
   // Confirmation modal component
-  const ConfirmationModal = ({ isOpen, itemCount, onConfirm, onCancel }) => {
-    if (!isOpen) return null
 
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
-          <div className="flex items-center justify-center mb-4">
-            <div className="bg-yellow-100 text-yellow-600 rounded-full p-3 mr-4">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-            </div>
-            <h2 className="text-xl font-bold text-gray-800">Mark Items as Admin Done</h2>
-          </div>
 
-          <p className="text-gray-600 text-center mb-6">
-            Are you sure you want to mark {itemCount} {itemCount === 1 ? "item" : "items"} as Admin Done?
-          </p>
 
-          <div className="flex justify-center space-x-4">
-            <button
-              onClick={onCancel}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onConfirm}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-            >
-              Confirm
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Admin Done submission handler - Store "Done" text instead of timestamp
-  const confirmMarkDone = async () => {
-    // Close the modal
-    setConfirmationModal({ isOpen: false, itemCount: 0 });
-    setMarkingAsDone(true);
-
-    try {
-      // Prepare submission data for multiple items
-      const submissionData = selectedHistoryItems.map((historyItem) => ({
-        taskId: historyItem._taskId || historyItem["col1"],
-        rowIndex: historyItem._rowIndex,
-        adminDoneStatus: "Admin Done", // This will update Column P
-      }));
-
-      const formData = new FormData();
-      formData.append("sheetName", CONFIG.SHEET_NAME);
-      formData.append("action", "updateAdminDone");
-      formData.append("rowData", JSON.stringify(submissionData));
-
-      const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-        method: "POST",
-        body: formData,
-      });
-      const result = await response.json();
-
-      if (result.success) {
-        // Remove processed items from history view
-        setHistoryData((prev) =>
-          prev.filter((item) => !selectedHistoryItems.some((selected) => selected._id === item._id))
-        );
-
-        setSelectedHistoryItems([]);
-        setSuccessMessage(`Successfully marked ${selectedHistoryItems.length} items as Admin Done!`);
-
-        // Refresh data
-        setTimeout(() => {
-          fetchSheetData();
-        }, 2000);
-      } else {
-        throw new Error(result.error || "Failed to mark items as Admin Done");
-      }
-    } catch (error) {
-      console.error("Error marking tasks as Admin Done:", error);
-      setSuccessMessage(`Failed to mark tasks as Admin Done: ${error.message}`);
-    } finally {
-      setMarkingAsDone(false);
-    }
-  };
 
   const filteredAccountData = useMemo(() => {
     if (!accountData.length) return []
@@ -728,100 +559,9 @@ function AccountDataPage() {
   }, [accountData, debouncedSearchTerm, searchTerm, selectedStatus, selectedMembers, startDate, endDate]);
 
   // Replace existing filteredHistoryData with this
-  const filteredHistoryData = useMemo(() => {
-    if (!historyData.length) return []
 
-    return historyData
-      .filter((item) => {
-        const matchesSearch = searchTerm
-          ? Object.values(item).some(
-            (value) => value && value.toString().toLowerCase().includes(searchTerm.toLowerCase()),
-          )
-          : true
-        const matchesMember = selectedMembers.length > 0 ? selectedMembers.includes(item["col4"]) : true
 
-        let matchesStatus = true;
-        if (selectedStatus) {
-          if (selectedStatus === "Leave") {
-            // Check if the item is a Leave item (marked by our isLeaveStatus helper or logic in fetchSheetData)
-            // We need to ensure logic in fetch set it correctly.
-            // In fetchSheetData, we set col16.
-            matchesStatus = isLeaveStatus(item["col16"]);
-          } else {
-            const submissionStatus = getSubmissionStatus(item["col10"], item["col11"], item["col16"]);
-            if (selectedStatus === "Done") {
-              matchesStatus = submissionStatus.status === "On time" || submissionStatus.status === "Late Submitted";
-            } else if (selectedStatus === "Pending") {
-              matchesStatus = submissionStatus.status === "—";
-            } else if (selectedStatus === "On time") {
-              matchesStatus = submissionStatus.status === "On time";
-            } else if (selectedStatus === "Late Submitted") {
-              matchesStatus = submissionStatus.status === "Late Submitted";
-            }
-          }
-        }
 
-        let matchesDateRange = true
-        if (startDate || endDate) {
-          const itemDate = parseDateFromDDMMYYYY(item["col10"])
-          if (!itemDate) return false
-          if (startDate) {
-            const startDateObj = new Date(startDate)
-            startDateObj.setHours(0, 0, 0, 0)
-            if (itemDate < startDateObj) matchesDateRange = false
-          }
-          if (endDate) {
-            const endDateObj = new Date(endDate)
-            endDateObj.setHours(23, 59, 59, 999)
-            if (itemDate > endDateObj) matchesDateRange = false
-          }
-        }
-        return matchesSearch && matchesMember && matchesStatus && matchesDateRange
-      })
-      .sort((a, b) => {
-        const dateStrA = a["col10"] || ""
-        const dateStrB = b["col10"] || ""
-        const dateA = parseDateFromDDMMYYYY(dateStrA)
-        const dateB = parseDateFromDDMMYYYY(dateStrB)
-        if (!dateA) return 1
-        if (!dateB) return -1
-        return dateB.getTime() - dateA.getTime()
-      })
-  }, [historyData, searchTerm, selectedMembers, selectedStatus, startDate, endDate, parseDateFromDDMMYYYY])
-
-  const displayedHistoryData = useMemo(() => {
-    return filteredHistoryData.slice(0, historyDisplayLimit);
-  }, [filteredHistoryData, historyDisplayLimit]);
-
-  const handleLoadMoreHistory = useCallback(() => {
-    if (historyDisplayLimit < filteredHistoryData.length && !isLoadingMoreHistory) {
-      setIsLoadingMoreHistory(true);
-      setTimeout(() => {
-        setHistoryDisplayLimit(prev => Math.min(prev + 500, filteredHistoryData.length));
-        setIsLoadingMoreHistory(false);
-      }, 300);
-    }
-  }, [historyDisplayLimit, filteredHistoryData.length, isLoadingMoreHistory]);
-
-  const getTaskStatistics = useCallback(() => {
-    const totalCompleted = historyData.length
-    const memberStats =
-      selectedMembers.length > 0
-        ? selectedMembers.reduce((stats, member) => {
-          const memberTasks = historyData.filter((task) => task["col4"] === member).length
-          return {
-            ...stats,
-            [member]: memberTasks,
-          }
-        }, {})
-        : {}
-    const filteredTotal = filteredHistoryData.length
-    return {
-      totalCompleted,
-      memberStats,
-      filteredTotal,
-    }
-  }, [historyData, selectedMembers, filteredHistoryData])
 
   const handleMemberSelection = useCallback((member) => {
     setSelectedMembers((prev) => {
@@ -845,7 +585,6 @@ function AccountDataPage() {
     try {
       setLoading(true)
       const pendingAccounts = []
-      const historyRows = []
       const response = await fetch(`${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.SHEET_NAME}&action=fetch`)
       if (!response.ok) {
         throw new Error(`Failed to fetch data: ${response.status}`)
@@ -972,20 +711,6 @@ function AccountDataPage() {
         const isAdminDone = !isEmpty(columnPValue) && columnPValue.toString().trim() === "Admin Done"
         const isLeave = isLeaveStatus(columnQValue);
 
-        // HISTORY LOGIC: For history, collect tasks that are Completed OR Admin Done OR Leave
-        // User request: "when Column Q (index-16) have Leave value ... show that data in history page"
-        if (hasColumnG) {
-          const isUserHistoryMatch = currentUserRole === "admin" || assignedTo.toLowerCase() === currentUsername.toLowerCase()
-          // Matches if: (Has Actual Date AND NOT Leave) OR Admin Done OR Leave
-          // Basically, any "finished" state.
-          // Note: Originally history required `hasColumnK`.
-          const isCompleted = hasColumnK || isAdminDone || isLeave;
-
-          if (isUserHistoryMatch && isCompleted) {
-            historyRows.push(rowData)
-          }
-        }
-
         // TASK PAGE LOGIC: Show Pending and Overdue tasks
         // Exclude: Done, Admin Done, Leave
         if (hasColumnG) {
@@ -1017,7 +742,6 @@ function AccountDataPage() {
 
       setMembersList(Array.from(membersSet).sort())
       setAccountData(pendingAccounts)
-      setHistoryData(historyRows)
       setLoading(false)
     } catch (error) {
       console.error("Error fetching sheet data:", error)
@@ -1122,10 +846,6 @@ function AccountDataPage() {
     setDisplayLimit(500);
   }, [debouncedSearchTerm, selectedStatus, selectedMembers, startDate, endDate]);
 
-  useEffect(() => {
-    setHistoryDisplayLimit(500);
-  }, [debouncedSearchTerm, selectedStatus, selectedMembers, startDate, endDate, showHistory]);
-
   const displayedAccountData = useMemo(() => {
     return filteredAccountData.slice(0, displayLimit);
   }, [filteredAccountData, displayLimit]);
@@ -1153,15 +873,15 @@ function AccountDataPage() {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.readAsDataURL(file)
-      reader.onload = () => resolve(reader.result)
+      reader.onload = () => {
+        const base64String = reader.result.split(",")[1]
+        resolve(base64String)
+      }
       reader.onerror = (error) => reject(error)
     })
   }
 
-  const toggleHistory = useCallback(() => {
-    setShowHistory((prev) => !prev)
-    resetFilters()
-  }, [resetFilters])
+
 
   // MAIN SUBMIT FUNCTION
   const handleSubmit = async () => {
@@ -1272,7 +992,6 @@ function AccountDataPage() {
 
       // Update local state
       setAccountData((prev) => prev.filter((item) => !selectedItems.has(item._id)));
-      setHistoryData((prev) => [...submittedItemsForHistory, ...prev]);
       setSelectedItems(new Set());
       setAdditionalData({});
       setRemarksData({});
@@ -1314,72 +1033,58 @@ function AccountDataPage() {
 
     return (
       <div className="p-4 border-b border-purple-100 bg-gray-50">
-        <div className="flex flex-wrap items-center justify-center gap-4">
+        <div className="flex flex-wrap items-end justify-center gap-6">
           {/* Status Filter */}
           <div className="flex flex-col">
-            <label className="text-sm font-medium text-purple-700 mb-1">
-              Filter by Status:
+            <label className="text-sm font-medium text-purple-700 mb-1.5">
+              Status:
             </label>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="text-sm border border-gray-200 rounded-md p-2 min-w-[130px]"
+              className="text-sm border border-purple-200 rounded-md p-2 min-w-[140px] focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white transition-all hover:border-purple-300"
             >
-              {showHistory ? (
-                <>
-                  <option value="On time">On time</option>
-                  <option value="Late Submitted">Late Submitted</option>
-                  <option value="Leave">Leave</option>
-                </>
-              ) : (
-                <>
-                  <option value="">All Status</option>
-                  <option value="Pending">Pending (Today Only)</option>
-                  <option value="Disabled">Overdue</option>
-                </>
-              )}
+              <option value="">All Status</option>
+              <option value="Pending">Pending (Today Only)</option>
+              <option value="Disabled">Overdue</option>
             </select>
           </div>
 
           {/* Name/Member Filter with Search Dropdown */}
           {getFilteredMembersList().length > 0 && (
-            <div className="flex flex-col relative">
-              <label className="text-sm font-medium text-purple-700 mb-1">
-                Filter by Member:
+            <div className="flex flex-col">
+              <label className="text-sm font-medium text-purple-700 mb-1.5">
+                Member:
               </label>
-              <div className="relative">
-                {/* Search input that triggers dropdown */}
-                <div className="relative">
-                  <Search
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                    size={14}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search members..."
-                    value={nameSearchTerm}
-                    onChange={(e) => setNameSearchTerm(e.target.value)}
-                    onClick={() => setIsDropdownOpen(true)}
-                    className="pl-8 pr-4 py-2 border border-gray-200 rounded-md text-sm w-[200px] focus:outline-none focus:ring-1 focus:ring-purple-500"
-                  />
+              <div className="relative w-[200px]">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-purple-400" />
                 </div>
+                <input
+                  type="text"
+                  placeholder="Search members..."
+                  value={nameSearchTerm}
+                  onChange={(e) => setNameSearchTerm(e.target.value)}
+                  onClick={() => setIsDropdownOpen(true)}
+                  className="pl-10 pr-4 py-2 border border-purple-200 rounded-md text-sm w-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all hover:border-purple-300 bg-white"
+                />
 
                 {/* Dropdown - only shows when clicked and has items */}
                 {isDropdownOpen && filteredMembersList.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-40 overflow-y-auto p-2 border border-gray-200 rounded-md bg-white shadow-lg">
-                    <div className="space-y-2">
+                  <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto p-2 border border-purple-200 rounded-md bg-white shadow-xl">
+                    <div className="space-y-1.5">
                       {filteredMembersList.map((member, idx) => (
-                        <div key={idx} className="flex items-center">
+                        <div key={idx} className="flex items-center p-1 hover:bg-purple-50 rounded transition-colors">
                           <input
                             id={`member-${idx}`}
                             type="checkbox"
-                            className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
                             checked={selectedMembers.includes(member)}
                             onChange={() => handleMemberSelection(member)}
                           />
                           <label
                             htmlFor={`member-${idx}`}
-                            className="ml-2 text-sm text-gray-700 whitespace-nowrap"
+                            className="ml-2.5 text-sm text-gray-700 whitespace-nowrap cursor-pointer select-none"
                           >
                             {member}
                           </label>
@@ -1388,68 +1093,59 @@ function AccountDataPage() {
                     </div>
                   </div>
                 )}
-
-                {/* Selected members display */}
-                {selectedMembers.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {selectedMembers.map((member) => (
-                      <span
-                        key={member}
-                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800"
-                      >
-                        {member}
-                        <button
-                          onClick={() => handleMemberSelection(member)}
-                          className="ml-1 text-purple-600 hover:text-purple-800"
-                        >
-                          <X size={12} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           )}
 
           {/* Date Range Filter */}
           <div className="flex flex-col">
-            <label className="text-sm font-medium text-purple-700 mb-1">
-              Filter by Date Range:
+            <label className="text-sm font-medium text-purple-700 mb-1.5">
+              Date Range:
             </label>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center">
-                <label
-                  htmlFor="start-date"
-                  className="text-sm text-gray-700 mr-1"
-                >
-                  From
-                </label>
+            <div className="flex items-center gap-2 bg-white border border-purple-200 rounded-md p-1">
+              <div className="flex items-center px-1">
+                <span className="text-[10px] uppercase font-bold text-gray-400 mr-2">From</span>
                 <input
                   id="start-date"
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="text-sm border border-gray-200 rounded-md p-1"
+                  className="text-sm border-none focus:ring-0 p-1 text-gray-700 cursor-pointer"
                 />
               </div>
-              <div className="flex items-center">
-                <label
-                  htmlFor="end-date"
-                  className="text-sm text-gray-700 mr-1"
-                >
-                  To
-                </label>
+              <div className="w-px h-6 bg-purple-100"></div>
+              <div className="flex items-center px-1">
+                <span className="text-[10px] uppercase font-bold text-gray-400 mr-2">To</span>
                 <input
                   id="end-date"
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="text-sm border border-gray-200 rounded-md p-1"
+                  className="text-sm border-none focus:ring-0 p-1 text-gray-700 cursor-pointer"
                 />
               </div>
             </div>
           </div>
+
+          {/* Selected members display (Under the filters) */}
+          {selectedMembers.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 max-w-[300px]">
+              {selectedMembers.map((member) => (
+                <span
+                  key={member}
+                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200"
+                >
+                  {member}
+                  <button
+                    onClick={() => handleMemberSelection(member)}
+                    className="ml-1.5 text-purple-600 hover:text-purple-800 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Clear Filters Button */}
           {(selectedMembers.length > 0 ||
@@ -1463,13 +1159,13 @@ function AccountDataPage() {
                   resetFilters();
                   setIsDropdownOpen(false);
                 }}
-                className="px-3 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 text-sm self-end"
+                className="px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-md hover:bg-red-100 transition-all text-sm font-medium h-[38px]"
               >
-                Clear All Filters
+                Clear All
               </button>
             )}
         </div>
-      </div>
+      </div >
     );
   };
 
@@ -1568,23 +1264,20 @@ function AccountDataPage() {
       <div className="space-y-6">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <h1 className="text-2xl font-bold tracking-tight text-purple-700">
-            {showHistory
-              ? CONFIG.PAGE_CONFIG.historyTitle
-              : CONFIG.PAGE_CONFIG.title}
+            {CONFIG.PAGE_CONFIG.title}
           </h1>
 
           {/* Search Input */}
-          <div className="relative w-full sm:w-auto flex-grow max-w-md mx-auto sm:mx-0">
-            <Search
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400"
-              size={16}
-            />
+          <div className="relative w-full sm:w-auto grow max-w-md mx-auto sm:mx-0">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-purple-400" />
+            </div>
             <input
               type="text"
-              placeholder={showHistory ? "Search history..." : "Search tasks..."}
+              placeholder="Search tasks..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 w-full text-sm bg-purple-50/30 transition-all hover:bg-white"
+              className="pl-11 pr-4 py-2.5 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 w-full text-base bg-purple-50/30 transition-all hover:bg-white shadow-sm"
             />
           </div>
 
@@ -1599,77 +1292,27 @@ function AccountDataPage() {
               Filters
             </button>
 
-            {/* History Toggle Button */}
-            <button
-              onClick={toggleHistory}
-              className="flex items-center justify-center py-2 px-4 bg-white text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-all duration-200 shadow-sm text-sm font-medium w-full sm:min-w-[140px] sm:w-auto"
-            >
-              {showHistory ? (
-                <>
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Tasks
-                </>
-              ) : (
-                <>
-                  <History className="h-4 w-4 mr-2" />
-                  History
-                </>
-              )}
-            </button>
 
-            {/* Admin Mark Done (History View) */}
-            {showHistory && userRole === "admin" && selectedHistoryItems.length > 0 && (
-              <button
-                onClick={handleMarkMultipleDone}
-                disabled={markingAsDone}
-                className="flex items-center justify-center py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 shadow-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed w-full sm:min-w-[140px] sm:w-auto"
-              >
-                {markingAsDone ? (
-                  <span className="flex items-center">
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Processing
-                  </span>
-                ) : (
-                  "Mark Admin Done"
-                )}
-              </button>
-            )}
 
             {/* Task Actions (Tasks View) */}
-            {!showHistory && (
-              <>
-                {/* Leave Button */}
-                {/* <button
-                  onClick={handleLeave}
-                  disabled={isSubmitting}
-                  className="flex items-center justify-center py-2 px-4 bg-red-100 text-red-700 border border-red-200 rounded-lg hover:bg-red-200 transition-all duration-200 shadow-sm text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed min-w-[100px]"
-                >
-                  Leave
-                </button> */}
-
-                {/* Submit Button */}
-                <button
-                  onClick={handleSubmit}
-                  disabled={selectedItemsCount === 0 || isSubmitting}
-                  className="flex items-center justify-center py-2 px-6 gradient-bg text-white rounded-lg hover:shadow-lg transition-all duration-200 shadow-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95 w-full sm:min-w-[140px] sm:w-auto"
-                >
-                  {isSubmitting ? (
-                    <span className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      ...
-                    </span>
-                  ) : (
-                    `Submit (${selectedItemsCount})`
-                  )}
-                </button>
-              </>
-            )}
+            {/* Submit Button */}
+            <button
+              onClick={handleSubmit}
+              disabled={selectedItemsCount === 0 || isSubmitting}
+              className="flex items-center justify-center py-2 px-6 gradient-bg text-white rounded-lg hover:shadow-lg transition-all duration-200 shadow-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95 w-full sm:min-w-[140px] sm:w-auto"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  ...
+                </span>
+              ) : (
+                `Submit (${selectedItemsCount})`
+              )}
+            </button>
           </div>
 
           {/* Admin Mark Done Button - Show in both mobile and desktop when conditions are met */}
@@ -1706,17 +1349,12 @@ function AccountDataPage() {
         )}
 
         <div className="rounded-lg border border-purple-200 shadow-md bg-white overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 p-4">
+          <div className="bg-linear-to-r from-purple-50 to-pink-50 border-b border-purple-100 p-4">
             <h2 className="text-purple-700 font-medium">
-              {showHistory
-                ? `Completed ${CONFIG.SHEET_NAME} Tasks`
-                : `All ${CONFIG.SHEET_NAME} Tasks`}
+              All {CONFIG.SHEET_NAME} Tasks
             </h2>
             <p className="text-purple-600 text-sm">
-              {showHistory
-                ? `${CONFIG.PAGE_CONFIG.historyDescription} for ${userRole === "admin" ? "all" : "your"
-                } tasks`
-                : CONFIG.PAGE_CONFIG.description}
+              {CONFIG.PAGE_CONFIG.description}
             </p>
           </div>
 
@@ -1738,478 +1376,6 @@ function AccountDataPage() {
                 Try again
               </button>
             </div>
-          ) : showHistory ? (
-            <>
-              {/* Confirmation Modal */}
-              <ConfirmationModal
-                isOpen={confirmationModal.isOpen}
-                itemCount={confirmationModal.itemCount}
-                onConfirm={confirmMarkDone}
-                onCancel={() =>
-                  setConfirmationModal({ isOpen: false, itemCount: 0 })
-                }
-              />
-
-              {/* Task Statistics */}
-              <div className="p-4 border-b border-purple-100 bg-blue-50">
-                <div className="flex flex-col">
-                  <h3 className="text-sm font-medium text-blue-700 mb-2">
-                    Task Completion Statistics:
-                  </h3>
-                  <div className="flex flex-wrap gap-4">
-                    <div className="px-3 py-2 bg-white rounded-md shadow-sm">
-                      <span className="text-xs text-gray-500">
-                        Total Completed
-                      </span>
-                      <div className="text-lg font-semibold text-blue-600">
-                        {getTaskStatistics().totalCompleted}
-                      </div>
-                    </div>
-                    {(selectedMembers.length > 0 ||
-                      startDate ||
-                      endDate ||
-                      searchTerm ||
-                      selectedStatus) && (
-                        <div className="px-3 py-2 bg-white rounded-md shadow-sm">
-                          <span className="text-xs text-gray-500">
-                            Filtered Results
-                          </span>
-                          <div className="text-lg font-semibold text-blue-600">
-                            {getTaskStatistics().filteredTotal}
-                          </div>
-                        </div>
-                      )}
-                    {selectedMembers.map((member) => (
-                      <div
-                        key={member}
-                        className="px-3 py-2 bg-white rounded-md shadow-sm"
-                      >
-                        <span className="text-xs text-gray-500">{member}</span>
-                        <div className="text-lg font-semibold text-indigo-600">
-                          {getTaskStatistics().memberStats[member]}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              {/* History Table */}
-              <div className="h-[calc(100vh-300px)] overflow-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50 sticky top-0 z-10">
-                    <tr>
-                      {/* Add this column header after the Admin Done column (if admin) or at the end */}
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px]">
-                        Edit
-                      </th>
-                      {/* Submission Status Column Header */}
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 min-w-[120px]">
-                        Submission Status
-                      </th>
-                      {/* Admin Select Column Header */}
-                      {userRole === "admin" && (
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
-                          <div className="flex flex-col items-center">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                              checked={
-                                // Only consider items that are NOT "Admin Done" for select all
-                                filteredHistoryData.filter(
-                                  (item) =>
-                                    isEmpty(item["col15"]) ||
-                                    item["col15"].toString().trim() !==
-                                    "Admin Done"
-                                ).length > 0 &&
-                                selectedHistoryItems.length ===
-                                filteredHistoryData.filter(
-                                  (item) =>
-                                    isEmpty(item["col15"]) ||
-                                    item["col15"].toString().trim() !==
-                                    "Admin Done"
-                                ).length
-                              }
-                              onChange={(e) => {
-                                // Only select items that are NOT "Admin Done"
-                                const unprocessedItems =
-                                  filteredHistoryData.filter(
-                                    (item) =>
-                                      isEmpty(item["col15"]) ||
-                                      item["col15"].toString().trim() !==
-                                      "Admin Done"
-                                  );
-                                if (e.target.checked) {
-                                  setSelectedHistoryItems(unprocessedItems);
-                                } else {
-                                  setSelectedHistoryItems([]);
-                                }
-                              }}
-                            />
-                            <span className="text-xs text-gray-400 mt-1">
-                              Admin
-                            </span>
-                          </div>
-                        </th>
-                      )}
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
-                        Task ID
-                      </th>
-
-
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
-                        Name
-                      </th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
-                        Task Description
-                      </th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 min-w-[80px]">
-                        Status
-                      </th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-purple-50 min-w-[150px]">
-                        Remarks
-                      </th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50 min-w-[140px]">
-                        Task Start Date & Time
-                      </th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px]">
-                        Freq
-                      </th>
-
-
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-green-50 min-w-[140px]">
-                        Actual Date & Time
-                      </th>
-
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
-                        Attachment
-                      </th>
-                      {/* Admin Done Date Column */}
-                      {userRole === "admin" && (
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 min-w-[140px]">
-                          Admin Done
-                        </th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {displayedHistoryData.length > 0 ? (
-                      <>
-                        {displayedHistoryData.map((history) => {
-                          const submissionStatus = getSubmissionStatus(
-                            history["col10"],
-                            history["col11"],
-                            history["col16"]
-                          );
-                          return (
-                            <tr key={history._id} className="hover:bg-gray-50">
-                              {/* Add this cell at the end of each row, after the Admin Done column (if admin) */}
-                              <td className="px-3 py-4 min-w-[80px]">
-                                {editingRemarks[history._id] ? (
-                                  <div className="flex space-x-2">
-                                    <button
-                                      onClick={() =>
-                                        handleEditRemarks(
-                                          history._id,
-                                          history["col13"],
-                                          history
-                                        )
-                                      }
-                                      className="text-green-600 hover:text-green-800"
-                                      title="Save"
-                                    >
-                                      <CheckCircle2 size={20} />
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        setEditingRemarks((prev) => ({
-                                          ...prev,
-                                          [history._id]: false,
-                                        }))
-                                      }
-                                      className="text-red-600 hover:text-red-800"
-                                      title="Cancel"
-                                    >
-                                      <X size={20} />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={() =>
-                                      setEditingRemarks((prev) => ({
-                                        ...prev,
-                                        [history._id]: true,
-                                      }))
-                                    }
-                                    className="text-blue-600 hover:text-blue-800"
-                                    title="Edit Remarks"
-                                  >
-                                    <Edit size={20} />
-                                  </button>
-                                )}
-                              </td>
-                              {/* Submission Status Column */}
-                              <td className="px-3 py-4 bg-blue-50 min-w-[120px]">
-                                <span
-                                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${submissionStatus.color === "green"
-                                    ? "bg-green-100 text-green-800"
-                                    : submissionStatus.color === "red"
-                                      ? "bg-red-100 text-red-800"
-                                      : "bg-gray-100 text-gray-800"
-                                    }`}
-                                >
-                                  {submissionStatus.status}
-                                </span>
-                              </td>
-                              {/* Admin Select Checkbox */}
-                              {userRole === "admin" && (
-                                <td className="px-3 py-4 w-12">
-                                  {!isEmpty(history["col15"]) &&
-                                    history["col15"].toString().trim() ===
-                                    "Admin Done" ? (
-                                    <div className="flex flex-col items-center">
-                                      <input
-                                        type="checkbox"
-                                        className="h-4 w-4 rounded border-gray-300 text-green-600 bg-green-100"
-                                        checked={true}
-                                        disabled={true}
-                                        title="Admin Done"
-                                      />
-                                      <span className="text-xs text-green-600 mt-1 text-center break-words">
-                                        Done
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex flex-col items-center">
-                                      <input
-                                        type="checkbox"
-                                        className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                                        checked={selectedHistoryItems.some(
-                                          (item) => item._id === history._id
-                                        )}
-                                        onChange={() => {
-                                          setSelectedHistoryItems((prev) =>
-                                            prev.some(
-                                              (item) => item._id === history._id
-                                            )
-                                              ? prev.filter(
-                                                (item) =>
-                                                  item._id !== history._id
-                                              )
-                                              : [...prev, history]
-                                          );
-                                        }}
-                                      />
-                                      <span className="text-xs text-gray-400 mt-1 text-center break-words">
-                                        Mark Done
-                                      </span>
-                                    </div>
-                                  )}
-                                </td>
-                              )}
-                              <td className="px-3 py-4 min-w-[100px]">
-                                <div className="text-sm font-medium text-gray-900 break-words">
-                                  {history["col1"] || "—"}
-                                </div>
-                              </td>
-
-
-                              <td className="px-3 py-4 min-w-[100px]">
-                                <div className="text-sm text-gray-900 break-words">
-                                  {history["col4"] || "—"}
-                                </div>
-                              </td>
-                              <td className="px-3 py-4 min-w-[200px]">
-                                <div
-                                  className="text-sm text-gray-900 break-words"
-                                  title={history["col5"]}
-                                >
-                                  {history["col5"] || "—"}
-                                </div>
-                              </td>
-                              <td className="px-3 py-4 bg-blue-50 min-w-[80px]">
-                                <span
-                                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full break-words ${history["col12"] === "Yes"
-                                    ? "bg-green-100 text-green-800"
-                                    : history["col12"] === "No"
-                                      ? "bg-red-100 text-red-800"
-                                      : "bg-gray-100 text-gray-800"
-                                    }`}
-                                >
-                                  {history["col12"] || "—"}
-                                </span>
-                              </td>
-                              <td className="px-3 py-4 bg-purple-50 min-w-[150px]">
-                                {editingRemarks[history._id] ? (
-                                  <input
-                                    type="text"
-                                    defaultValue={history["col13"] || ""}
-                                    onChange={(e) =>
-                                      setTempRemarks((prev) => ({
-                                        ...prev,
-                                        [history._id]: e.target.value,
-                                      }))
-                                    }
-                                    className="border rounded-md px-2 py-1 w-full text-sm"
-                                    autoFocus
-                                  />
-                                ) : (
-                                  <span className="text-sm text-gray-900 break-words">
-                                    {history["col13"] || "—"}
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-3 py-4 bg-yellow-50 min-w-[140px]">
-                                <div className="text-sm text-gray-900 break-words">
-                                  {history["col6"] ? (
-                                    <div>
-                                      <div className="font-medium break-words">
-                                        {history["col6"].includes(" ")
-                                          ? history["col6"].split(" ")[0]
-                                          : history["col6"]}
-                                      </div>
-                                      {history["col6"].includes(" ") && (
-                                        <div className="text-xs text-gray-500 break-words">
-                                          {history["col6"].split(" ")[1]}
-                                        </div>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    "—"
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-3 py-4 min-w-[80px]">
-                                <div className="text-sm text-gray-900 break-words">
-                                  {history["col7"] || "—"}
-                                </div>
-                              </td>
-
-
-                              <td className="px-3 py-4 bg-green-50 min-w-[140px]">
-                                <div className="text-sm text-gray-900 break-words">
-                                  {history["col10"] ? (
-                                    <div>
-                                      <div className="font-medium break-words">
-                                        {history["col10"].includes(" ")
-                                          ? history["col10"].split(" ")[0]
-                                          : history["col10"]}
-                                      </div>
-                                      {history["col10"].includes(" ") && (
-                                        <div className="text-xs text-gray-500 break-words">
-                                          {history["col10"].split(" ")[1]}
-                                        </div>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    "—"
-                                  )}
-                                </div>
-                              </td>
-
-                              <td className="px-3 py-4 min-w-[100px]">
-                                {history["col14"] ? (
-                                  <a
-                                    href={history["col14"]}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 hover:text-blue-800 underline flex items-center break-words"
-                                  >
-                                    <img
-                                      src={
-                                        history["col14"] ||
-                                        "/placeholder.svg?height=32&width=32"
-                                      }
-                                      alt="Attachment"
-                                      className="h-8 w-8 object-cover rounded-md mr-2 flex-shrink-0"
-                                    />
-                                    <span className="break-words">View</span>
-                                  </a>
-                                ) : (
-                                  <span className="text-gray-400">
-                                    No attachment
-                                  </span>
-                                )}
-                              </td>
-
-                              {/* Admin Done Column */}
-                              {userRole === "admin" && (
-                                <td className="px-3 py-4 bg-gray-50 min-w-[140px]">
-                                  {!isEmpty(history["col15"]) &&
-                                    history["col15"].toString().trim() ===
-                                    "Admin Done" ? (
-                                    <div className="text-sm text-gray-900 break-words">
-                                      <div className="flex items-center">
-                                        <div className="h-4 w-4 rounded border-gray-300 text-green-600 bg-green-100 mr-2 flex items-center justify-center">
-                                          <span className="text-xs text-green-600">
-                                            ✓
-                                          </span>
-                                        </div>
-                                        <div className="flex flex-col">
-                                          <div className="font-medium text-green-700 text-sm">
-                                            Done
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center text-gray-400 text-sm">
-                                      <div className="h-4 w-4 rounded border-gray-300 mr-2"></div>
-                                      <span>Pending</span>
-                                    </div>
-                                  )}
-                                </td>
-                              )}
-                            </tr>
-                          );
-                        })}
-
-                        {/* Load More Button for History */}
-                        {historyDisplayLimit < filteredHistoryData.length && (
-                          <tr>
-                            <td
-                              colSpan={userRole === "admin" ? 16 : 14}
-                              className="px-6 py-4 text-center"
-                            >
-                              <button
-                                onClick={handleLoadMoreHistory}
-                                disabled={isLoadingMoreHistory}
-                                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {isLoadingMoreHistory ? (
-                                  <div className="flex items-center justify-center">
-                                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-                                    Loading...
-                                  </div>
-                                ) : (
-                                  `Load More (${filteredHistoryData.length -
-                                  historyDisplayLimit
-                                  } remaining)`
-                                )}
-                              </button>
-                            </td>
-                          </tr>
-                        )}
-                      </>
-                    ) : (
-                      <tr>
-                        <td
-                          colSpan={userRole === "admin" ? 16 : 14}
-                          className="px-6 py-4 text-center text-gray-500"
-                        >
-                          {searchTerm ||
-                            selectedMembers.length > 0 ||
-                            startDate ||
-                            endDate ||
-                            selectedStatus
-                            ? "No historical records matching your filters"
-                            : "No completed records found"}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </>
           ) : (
             <>
               {/* Desktop Table View */}
