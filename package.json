@@ -19,6 +19,7 @@
     "@radix-ui/react-slot": "^1.1.2",
     "@tailwindcss/vite": "^4.0.9",
     "axios": "^1.8.1",
+    "date-fns": "^4.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "core-js": "^3.37.0",
